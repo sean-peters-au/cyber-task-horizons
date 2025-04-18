@@ -1,0 +1,21 @@
+.env
+
+logs/   
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# cloned repos
+hcast-public/
+eval-analysis-public/
+modular-public/
+RE-bench/
+vivaria/

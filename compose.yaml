@@ -1,0 +1,7 @@
+services:
+  default:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true # Enable proper PID 1 behavior
+    command: tail -f /dev/null # Keep container alive 
