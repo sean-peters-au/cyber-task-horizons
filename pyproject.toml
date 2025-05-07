@@ -9,4 +9,6 @@ dependencies = [
     "google-generativeai>=0.8.5",
     "inspect-ai>=0.3.89",
     "openai>=1.75.0",
+    "pandas>=2.2.3",
+    "seaborn>=0.13.2",
 ]

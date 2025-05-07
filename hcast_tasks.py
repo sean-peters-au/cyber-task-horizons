@@ -9,6 +9,7 @@ from inspect_ai.scorer import Score, Scorer, Target, scorer
 from inspect_ai.solver import Solver
 from inspect_ai.agent import react
 from inspect_ai.tool import ToolError, bash_session, text_editor
+from inspect_ai.util import sandbox
 
 # --- Agent Definition ---
 # Placeholder prompt - needs refinement based on modular-public's actual prompt
@@ -51,10 +52,11 @@ def pytest_scorer() -> Scorer:
     Also checks if tests.py was modified.
     """
     async def score(state, target: Target) -> Score:
-        # Get the sandbox environment from the task state
-        sandbox_env = getattr(state, 'sandbox', None)
-        if sandbox_env is None:
-            return Score(value=0.0, passed=False, explanation="Sandbox not available for scoring.")
+        # Use the sandbox() utility to get the current sandbox environment
+        try:
+            sandbox_env = sandbox()
+        except RuntimeError as e:
+            return Score(value=0.0, passed=False, explanation=f"Error getting sandbox: {e}. Scorer likely called outside sandbox context.")
 
         # --- Check 1: tests.py modification ---
         # Path to original test file on the host machine running 'inspect eval'
@@ -91,14 +93,14 @@ def pytest_scorer() -> Scorer:
             pytest_command = ["pytest", "-q", "--tb=no", f"{APP_PATH_IN_SANDBOX}/tests.py"]
             # Check if pytest exists - this is a basic check, might need refinement
             check_pytest = await sandbox_env.exec(["which", "pytest"])
-            if check_pytest.exit_code != 0:
+            if not check_pytest.success:
                 # Attempt to install pytest if not found
                 install_result = await sandbox_env.exec(["pip", "install", "pytest"])
-                if install_result.exit_code != 0:
+                if not install_result.success:
                     return Score(value=0.0, passed=False, explanation=f"pytest not found and installation failed: {install_result.stderr}")
                 # Re-check after install attempt (optional, but good practice)
                 check_pytest = await sandbox_env.exec(["which", "pytest"])
-                if check_pytest.exit_code != 0:
+                if not check_pytest.success:
                      return Score(value=0.0, passed=False, explanation="pytest installed but still not found in PATH?")
 
             result = await sandbox_env.exec(pytest_command) # Use exec which returns ExecResult

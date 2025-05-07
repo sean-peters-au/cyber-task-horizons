@@ -1,6 +1,10 @@
 .env
 
+docs/build/
 logs/   
+data/
+results/
+docs/working-docs
 
 # Python-generated files
 __pycache__/

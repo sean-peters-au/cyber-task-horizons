@@ -12,3 +12,13 @@ git clone git@github.com:METR/vivaria.git
 curl -fsSL https://get.uv.dev | bash
 uv sync
 ```
+
+# Download the dataset
+```bash
+wget "https://zenodo.org/records/8136017/files/data.zip?download=1" -O cybersecurity_dataset_v4.zip
+unzip cybersecurity_dataset_v4.zip
+```
+
+```
+brew install sphinx-doc
+```
