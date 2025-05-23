@@ -4,38 +4,35 @@ import logging
 import sys
 from typing import Optional
 
-# Ensure the src directory is in the Python path for module resolution
-# This is often needed if running cli.py directly during development without full package installation
-# For python -m human_ttc_eval.cli, this might not be strictly necessary
-# but doesn't hurt for robustness if structure changes slightly.
-# current_dir = Path(__file__).resolve().parent
-# src_dir = current_dir.parent # This would be human_ttc_eval
-# sys.path.insert(0, str(src_dir.parent)) # This would be src/
-
-# Import dataset modules to ensure they register themselves
-# These imports must happen before get_parser/get_summariser are called by Click
-# when the CLI commands are being set up.
 try:
     from .datasets.kypo import parser as kypo_parser_module # noqa
     from .datasets.kypo import summariser as kypo_summariser_module # noqa
-    # Add imports for other datasets here as they are created, e.g.:
-    # from .datasets.another_dataset import parser as another_parser_module # noqa
+    from .datasets.cybench import retrieve as cybench_retrieve_module # noqa
+    from .datasets.cybench import parser as cybench_parser_module # noqa
+    from .datasets.cybench import summariser as cybench_summariser_module # noqa
+    from .datasets.nl2bash import retrieve as nl2bash_retrieve_module # noqa
+    from .datasets.nl2bash import parser as nl2bash_parser_module # noqa
+    from .datasets.nl2bash import summariser as nl2bash_summariser_module # noqa
 except ImportError as e:
     # This fallback is for making the CLI runnable for basic commands like --help
     # even if dataset-specific dependencies are missing, though parse/summarise will fail.
     print(f"Warning: Could not import all dataset modules: {e}. Some commands might fail.", file=sys.stderr)
 
-from .core.registry import get_parser, list_parsers, get_summariser, list_summarisers
-# from .core.utils import slugify # Not directly used in CLI logic itself
+from .core.registry import get_parser, list_parsers, get_summariser, list_summarisers, get_retriever, list_retrievers
+
+# Import benchmark modules
+try:
+    from .datasets.cybench import bench as cybench_bench_module # noqa
+except ImportError as e:
+    print(f"Warning: Could not import benchmark modules: {e}. Some commands might fail.", file=sys.stderr)
 
 # Configure basic logging for the CLI
-# Match the format from core.utils for consistency if desired, or keep simple for CLI.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-logger = logging.getLogger("human_ttc_eval.cli") # Explicit logger name
+logger = logging.getLogger("human_ttc_eval.cli")
 
 @click.group()
 def cli():
-    """Human-TTC-Eval: A CLI tool for parsing and summarizing datasets."""
+    """Human-TTC-Eval: A CLI tool for parsing, summarizing, and retrieving datasets."""
     pass
 
 @cli.command("list-parsers")
@@ -60,10 +57,7 @@ def cli_list_parsers():
 @click.option("--output-file", "-o", required=True, 
               type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
               help="Path to the output JSONL file.")
-@click.option("--data-root-relative", 
-              type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True), 
-              help="Optional: Base path for calculating relative file paths within logs (e.g., for KYPO's _raw_file_path). Defaults to input-dir.")
-def cli_parse(dataset_name: str, input_dir: str, output_file: str, data_root_relative: Optional[str]):
+def cli_parse(dataset_name: str, input_dir: str, output_file: str):
     """Parses a specified dataset and writes output to a JSONL file."""
     logger.info(f"CLI parse command initiated for dataset: '{dataset_name}'")
     try:
@@ -71,19 +65,8 @@ def cli_parse(dataset_name: str, input_dir: str, output_file: str, data_root_rel
         input_path = Path(input_dir)
         output_path = Path(output_file)
         
-        data_root_for_rel_paths_path = Path(data_root_relative) if data_root_relative else input_path
-
-        # Specific instantiation for KypoParser if needed, or general approach:
-        if hasattr(parser_class, "data_root_for_relative_paths") or dataset_name == "kypo": # A bit heuristic
-            parser_instance = parser_class(
-                input_dir=input_path, 
-                output_file=output_path,
-                data_root_for_relative_paths=data_root_for_rel_paths_path
-            )
-            logger.info(f"Instantiated {dataset_name} parser with data_root_for_relative_paths: {data_root_for_rel_paths_path}")
-        else:
-            parser_instance = parser_class(input_dir=input_path, output_file=output_path)
-            logger.info(f"Instantiated {dataset_name} parser with default constructor.")
+        parser_instance = parser_class(input_dir=input_path, output_file=output_path)
+        logger.info(f"Instantiated {dataset_name} parser")
 
         click.echo(f"Starting parsing for dataset: {dataset_name}...")
         runs_data = parser_instance.parse()
@@ -150,6 +133,136 @@ def cli_summarise(dataset_name: str, jsonl_file: str, output_dir: str):
     except Exception as e:
         click.echo(f"An unexpected error occurred during summarisation of '{dataset_name}': {e}", err=True)
         logger.error(f"Unexpected error during summarisation of '{dataset_name}':", exc_info=True)
+
+@cli.group("retrieve")
+def cli_retrieve():
+    """Commands for retrieving raw data or metadata for datasets."""
+    pass
+
+@cli_retrieve.command("list")
+def cli_retrieve_list():
+    """Lists all available dataset retrievers."""
+    try:
+        retrievers = list_retrievers()
+        if retrievers:
+            click.echo("Available retrievers:")
+            for r_name in retrievers:
+                click.echo(f"- {r_name}")
+        else:
+            click.echo("No retrievers registered. Ensure dataset retriever modules are imported in cli.py.")
+    except Exception as e:
+        click.echo(f"Error listing retrievers: {e}", err=True)
+
+@cli_retrieve.command("metadata")
+@click.argument("dataset_name", type=str)
+@click.option("--output-dir", "-o", required=True, 
+              type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
+              help="Directory to save the output metadata.")
+def cli_retrieve_metadata(dataset_name: str, output_dir: str):
+    """Retrieve metadata for any supported dataset."""
+    logger.info(f"CLI retrieve metadata initiated for dataset: '{dataset_name}'")
+    try:
+        from .config import CYBENCH_REPO_PATH
+        
+        retriever_class = get_retriever(dataset_name)
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Handle dataset-specific initialization
+        if dataset_name == "cybench":
+            retriever_instance = retriever_class(output_dir=output_path, cybench_repo_path=CYBENCH_REPO_PATH)
+            result = retriever_instance.retrieve_metadata()
+        elif dataset_name == "nl2bash":
+            retriever_instance = retriever_class()
+            result = retriever_instance.retrieve_metadata()
+            # Save nl2bash metadata to JSON file
+            metadata_file = output_path / "nl2bash_metadata.json"
+            import json
+            with open(metadata_file, 'w') as f:
+                json.dump(result, f, indent=2)
+            result = metadata_file
+        else:
+            click.echo(f"Unsupported dataset: {dataset_name}", err=True)
+            return
+
+        click.echo(f"Successfully retrieved {dataset_name} metadata to: {result}")
+
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        logger.error(f"ValueError during {dataset_name} metadata setup: {e}")
+    except Exception as e:
+        click.echo(f"An unexpected error occurred during {dataset_name} metadata retrieval: {e}", err=True)
+        logger.error(f"Unexpected error during {dataset_name} metadata retrieval: {e}", exc_info=True)
+
+@cli.group("benchmark") 
+def cli_benchmark():
+    """Commands for running AI model evaluations on datasets."""
+    pass
+
+@cli_benchmark.command("cybench")
+@click.option("--model", required=True, 
+              help="Model identifier (e.g., 'openai/gpt-4o-2024-05-13'). See CyBench docs for full list.")
+@click.option("--output-dir", "-o", required=True,
+              type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
+              help="Directory to save benchmark results.")
+@click.option("--tasks", 
+              help="Comma-separated list of specific tasks to run. If not provided, runs all tasks.")
+@click.option("--max-iterations", default=15, type=int,
+              help="Maximum iterations per task.")
+@click.option("--unguided-mode", is_flag=True, default=False,
+              help="Run in unguided mode (single objective, no subtasks).")
+def cli_benchmark_cybench(model: str, output_dir: str, 
+                         tasks: Optional[str], max_iterations: int, unguided_mode: bool):
+    """Run CyBench evaluation using their native system."""
+    logger.info(f"CLI benchmark cybench initiated for model: {model}")
+    try:
+        from .datasets.cybench.bench import CyBenchBench
+        from .config import CYBENCH_REPO_PATH
+        
+        # Parse tasks if provided
+        task_list = None
+        if tasks:
+            task_list = [task.strip() for task in tasks.split(",") if task.strip()]
+            click.echo(f"Running evaluation on {len(task_list)} specific tasks")
+        else:
+            click.echo("Running evaluation on all available tasks")
+        
+        # Initialize benchmark runner
+        bench = CyBenchBench(
+            output_dir=Path(output_dir),
+            cybench_repo_path=CYBENCH_REPO_PATH
+        )
+        
+        # Validate model
+        if not bench.validate_model_name(model):
+            available = ", ".join(bench.AVAILABLE_MODELS)
+            click.echo(f"Error: Model '{model}' not supported by CyBench.", err=True)
+            click.echo(f"Available models: {available}", err=True)
+            return
+        
+        click.echo(f"Starting CyBench evaluation for model: {model}")
+        click.echo(f"This may take a while (up to 2 hours)...")
+        
+        # Run evaluation
+        result = bench.run_evaluation(
+            model_name=model,
+            tasks=task_list,
+            max_iterations=max_iterations,
+            unguided_mode=unguided_mode
+        )
+        
+        if result.success:
+            click.echo(f"✅ Evaluation completed successfully!")
+            click.echo(f"📊 Results: {result.summary_stats['successful_tasks']}/{result.summary_stats['total_tasks']} tasks successful")
+            click.echo(f"📁 Detailed results saved to: {output_dir}")
+        else:
+            click.echo(f"❌ Evaluation failed: {result.error_message}", err=True)
+            
+    except ImportError as e:
+        click.echo(f"Error: Could not import CyBenchBench: {e}", err=True)
+    except Exception as e:
+        click.echo(f"An unexpected error occurred: {e}", err=True)
+        logger.error(f"Unexpected error during cybench benchmark: {e}", exc_info=True)
 
 if __name__ == "__main__":
     # This makes the CLI runnable when you execute the script directly

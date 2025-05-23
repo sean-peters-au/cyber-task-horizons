@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Dict, Any
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BaseParser(ABC):
     """
@@ -42,18 +45,4 @@ class BaseParser(ABC):
                 # Filter out None values before writing, similar to existing parser
                 filtered_run_data = {k: v for k, v in run_data.items() if v is not None}
                 f.write(json.dumps(filtered_run_data) + '\n')
-        print(f"Successfully wrote {len(runs)} records to {self.output_file}") # Replace with logging
-
-# Example of how this might be used by a CLI later:
-# if __name__ == '__main__':
-#     # This part would be in cli.py or a top-level script
-#     parser_name = sys.argv[1] # e.g., "kypo"
-#     input_path = Path(sys.argv[2])
-#     output_path = Path(sys.argv[3])
-#
-#     # Using a registry (to be defined in core/registry.py)
-#     # parser_class = get_parser(parser_name)
-#     # parser_instance = parser_class(input_dir=input_path, output_file=output_path)
-#     # runs = parser_instance.parse()
-#     # if runs:
-#     #     parser_instance.write_jsonl(runs) 
+        logger.info(f"Successfully wrote {len(runs)} records to {self.output_file}")

@@ -1,45 +1,69 @@
 from typing import Dict, Type, Callable, List
 from .base_parser import BaseParser
 from .base_summariser import BaseSummariser
+from .base_retriever import BaseRetriever
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Global registries
-_PARSERS: Dict[str, Type[BaseParser]] = {}
-_SUMMARISERS: Dict[str, Type[BaseSummariser]] = {}
+_parsers: Dict[str, Type[BaseParser]] = {}
+_summarisers: Dict[str, Type[BaseSummariser]] = {}
+_retrievers: Dict[str, Type[BaseRetriever]] = {}
 
 def register_parser(name: str) -> Callable[[Type[BaseParser]], Type[BaseParser]]:
-    """Decorator to register a new parser class."""
+    """Decorator to register a parser class."""
     def decorator(cls: Type[BaseParser]) -> Type[BaseParser]:
-        if name in _PARSERS:
-            print(f"Warning: Parser '{name}' already registered. Overwriting.") # Replace with logging
-        _PARSERS[name] = cls
+        if name in _parsers:
+            logger.warning(f"Parser '{name}' already registered. Overwriting.")
+        _parsers[name] = cls
         return cls
     return decorator
 
 def get_parser(name: str) -> Type[BaseParser]:
-    """Retrieve a parser class from the registry."""
-    if name not in _PARSERS:
-        raise ValueError(f"No parser registered for '{name}'. Available: {list(_PARSERS.keys())}")
-    return _PARSERS[name]
+    """Get a registered parser class by name."""
+    if name not in _parsers:
+        raise ValueError(f"Parser '{name}' not found. Available parsers: {list(_parsers.keys())}")
+    return _parsers[name]
 
 def list_parsers() -> List[str]:
-    """Return a list of names of all registered parsers."""
-    return list(_PARSERS.keys())
+    """List all registered parser names."""
+    return list(_parsers.keys())
 
 def register_summariser(name: str) -> Callable[[Type[BaseSummariser]], Type[BaseSummariser]]:
-    """Decorator to register a new summariser class."""
+    """Decorator to register a summariser class."""
     def decorator(cls: Type[BaseSummariser]) -> Type[BaseSummariser]:
-        if name in _SUMMARISERS:
-            print(f"Warning: Summariser '{name}' already registered. Overwriting.") # Replace with logging
-        _SUMMARISERS[name] = cls
+        if name in _summarisers:
+            logger.warning(f"Summariser '{name}' already registered. Overwriting.")
+        _summarisers[name] = cls
         return cls
     return decorator
 
 def get_summariser(name: str) -> Type[BaseSummariser]:
-    """Retrieve a summariser class from the registry."""
-    if name not in _SUMMARISERS:
-        raise ValueError(f"No summariser registered for '{name}'. Available: {list(_SUMMARISERS.keys())}")
-    return _SUMMARISERS[name]
+    """Get a registered summariser class by name."""
+    if name not in _summarisers:
+        raise ValueError(f"Summariser '{name}' not found. Available summarisers: {list(_summarisers.keys())}")
+    return _summarisers[name]
 
 def list_summarisers() -> List[str]:
-    """Return a list of names of all registered summarisers."""
-    return list(_SUMMARISERS.keys()) 
+    """List all registered summariser names."""
+    return list(_summarisers.keys())
+
+def register_retriever(name: str) -> Callable[[Type[BaseRetriever]], Type[BaseRetriever]]:
+    """Decorator to register a retriever class."""
+    def decorator(cls: Type[BaseRetriever]) -> Type[BaseRetriever]:
+        if name in _retrievers:
+            logger.warning(f"Retriever '{name}' already registered. Overwriting.")
+        _retrievers[name] = cls
+        return cls
+    return decorator
+
+def get_retriever(name: str) -> Type[BaseRetriever]:
+    """Get a registered retriever class by name."""
+    if name not in _retrievers:
+        raise ValueError(f"Retriever '{name}' not found. Available retrievers: {list(_retrievers.keys())}")
+    return _retrievers[name]
+
+def list_retrievers() -> List[str]:
+    """List all registered retriever names."""
+    return list(_retrievers.keys()) 
