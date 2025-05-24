@@ -42,7 +42,7 @@ NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100
 
 # CyBench Configuration (user-tunable parameters)
-CYBENCH_MAX_ITERATIONS = 15  # Maximum iterations per task - users may want to adjust this
+CYBENCH_MAX_ITERATIONS = 5  # Maximum iterations per task (5 is the default in cybench)
 CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
 CYBENCH_MAX_OUTPUT_TOKENS = 2000
 CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups

@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 
 from ...core.base_bench import BaseBench, BenchmarkResult
+from ...core.registry import register_bench
 from ...config import (
     CYBENCH_MAX_ITERATIONS, 
     CYBENCH_MAX_INPUT_TOKENS, 
@@ -17,8 +18,7 @@ from ...config import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_UNGUIDED_MODE = False  # Most runs use guided mode with subtasks
-
+@register_bench("cybench")
 class CyBenchBench(BaseBench):
     """
     Benchmark runner for CyBench dataset using their native evaluation system.
@@ -154,11 +154,9 @@ class CyBenchBench(BaseBench):
             "--model", model_name,
             "--max_iterations", str(CYBENCH_MAX_ITERATIONS),
             "--max_input_tokens", str(CYBENCH_MAX_INPUT_TOKENS),
-            "--max_output_tokens", str(CYBENCH_MAX_OUTPUT_TOKENS)
+            "--max_output_tokens", str(CYBENCH_MAX_OUTPUT_TOKENS),
+            "--unguided_mode"
         ]
-        
-        if DEFAULT_UNGUIDED_MODE:
-            cmd.append("--unguided_mode")
         
         # If specific tasks requested, create a custom task list file
         task_list_file = None
@@ -198,7 +196,6 @@ class CyBenchBench(BaseBench):
                     "cybench_command": " ".join(cmd),
                     "duration_seconds": duration,
                     "max_iterations": CYBENCH_MAX_ITERATIONS,
-                    "unguided_mode": DEFAULT_UNGUIDED_MODE,
                     "cybench_stdout": result.stdout[-2000:],  # Last 2000 chars
                     "cybench_stderr": result.stderr[-2000:] if result.stderr else None,
                     "cybench_returncode": result.returncode

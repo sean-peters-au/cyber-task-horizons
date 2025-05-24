@@ -1,10 +1,10 @@
 # Clone the repos
 ```bash
-git clone git@github.com:METR/eval-analysis-public.git
-git clone https://github.com/METR/hcast-public
-git clone git@github.com:METR/RE-Bench.git
-git clone git@github.com:poking-agents/modular-public.git
-git clone git@github.com:METR/vivaria.git
+git clone --depth=1 https://github.com/METR/eval-analysis-public.git
+git clone --depth=1 https://github.com/princeton-nlp/intercode.git
+git clone --depth=1 https://github.com/andyzorigin/cybench.git third-party/cybench
+git clone --depth=1 https://github.com/NYU-LLM-CTF/NYU_CTF_Bench.git
+git clone --depth=1 https://github.com/TellinaTool/nl2bash.git
 ```
 
 # Install uv and sync

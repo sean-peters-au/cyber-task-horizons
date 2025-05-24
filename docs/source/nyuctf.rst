@@ -3,6 +3,12 @@
 
 .. default-role:: literal
 
+.. note::
+    The integration plan outlined below is **theoretical and in an early design phase** as of May 2025. 
+    It represents initial guesswork and ideas for incorporating the NYU-CTF Bench dataset. 
+    No implementation has been started, and further investigation of the dataset and its 
+    practical integration is required.
+
 NYU-CTF Bench — Strategy & Implementation Plan
 ==============================================
 *(v 0.1 · 7 May 2025)*
@@ -13,7 +19,7 @@ NYU-CTF Bench — Strategy & Implementation Plan
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
 | item             | detail                                                                                                                                        | source                 |
 +==================+=============================================================================================================================================+========================+
-| Name             | **NYU-CTF Bench** (a.k.a. “NYU CTF Dataset”)                                                                                                  | `arXiv NYU`_           |
+| Name             | **NYU-CTF Bench** (a.k.a. "NYU CTF Dataset")                                                                                                  | `arXiv NYU`_           |
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
 | Purpose          | Evaluate LLM agents on *interactive* cybersecurity tasks drawn from the CSAW-CTF competition series (2011 – 2023).                            |                        |
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
@@ -23,7 +29,7 @@ NYU-CTF Bench — Strategy & Implementation Plan
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
 | Repo             | `https://github.com/NYU-LLM-CTF/NYU_CTF_Bench` and PyPI package `nyuctf`.                                                                     | `GitHub NYU`_, `PyPI NYU`_ |
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
-| Associated paper | *“NYU CTF Dataset: A Scalable Open-Source Benchmark for Evaluating LLMs in Offensive Security”* (NeurIPS 2024 D&B).                          | `arXiv NYU`_           |
+| Associated paper | *"NYU CTF Dataset: A Scalable Open-Source Benchmark for Evaluating LLMs in Offensive Security"* (NeurIPS 2024 D&B).                          | `arXiv NYU`_           |
 +------------------+---------------------------------------------------------------------------------------------------------------------------------------------+------------------------+
 
 Folder layout (after install / clone):
@@ -38,7 +44,7 @@ Folder layout (after install / clone):
                      ├─ challenge.json   # metadata, port, points
                      ├─ docker-compose.yaml
                      └─ run.sh           # boots server & checker
-    development/           # 55-challenge “train” split
+    development/           # 55-challenge "train" split
     scripts/
      nyu_scrape_scoreboard.py
      nyu_build_metadata.py
@@ -79,7 +85,7 @@ Goal = **strict upper-bound human working time**.
 Algorithm for each challenge `c` within a given year:
 
 1. Query `/challenges/<id>/solves` → list of solves `S`.
-2. For every `(team, t_solve)` in `S`, fetch that team’s *earliest* solve in the contest:
+2. For every `(team, t_solve)` in `S`, fetch that team's *earliest* solve in the contest:
 
    .. code-block:: python
 
@@ -175,36 +181,12 @@ Flags are regenerated on container boot:
 * **Outbound Internet** – agent network is *isolated*; `/etc/resolv.conf` points to dummy DNS.
 * **Resource abuse** – CPU/mem quotas passed to Docker; all writes confined to `/workspace/tmp`.
 
-7 Milestones
-------------
-
-+-------------------------+-------------------------------------------------------------------------+------+
-| phase                     | deliverable                                                               | time   |
-+=========================+=========================================================================+======+
-| **0. Clone & scrape**     | Repo + scoreboard JSON for 2015-24; build `human_time.jsonl`.             | 0.5 d  |
-+-------------------------+-------------------------------------------------------------------------+------+
-| **1. Baseline run**       | GPT-3.5 & GPT-4o on all timed tasks (strict filter).                      | 1 d    |
-+-------------------------+-------------------------------------------------------------------------+------+
-| **2. Horizon curves**     | Notebook generating METR-style plots; include CyBench overlay.            | +0.5 d |
-+-------------------------+-------------------------------------------------------------------------+------+
-| **3. Sparse-timing gaps** | Decide whether to keep or drop challenges with `timing_quality="sparse"`. | +0.5 d |
-+-------------------------+-------------------------------------------------------------------------+------+
-| **4. Paper section**      | “NYU-CTF replication” methods & results write-up.                         | +1 d   |
-+-------------------------+-------------------------------------------------------------------------+------+
-
-Total ≈ 3 work-days once infra is ready.
-
-8 Open questions / next actions
+7 Open questions / next actions
 -------------------------------
 
 * **API auth** – some older CSAW scoreboards still require login; easiest fix is to spin up a headless browser once per contest and export cookies for the scrape script.
 * **Dev vs test split** – keep the official *development* folder for *prompt-engineering only*; never score on it to avoid over-fitting.
 * **Port collisions** – when running many challenges in parallel, randomise exposed host ports with `docker-compose --project-name`.
-
-Ready for sign-off
-------------------
-
-If this NYU-CTF plan aligns with your expectations, the next strategy brief will cover **picoCTF easy tier** (short horizon) followed by the **filtered NL2Bash** micro-study.
 
 .. _arXiv NYU: https://arxiv.org/abs/2406.05590?utm_source=chatgpt.com
 .. _GitHub NYU: https://github.com/NYU-LLM-CTF/NYU_CTF_Bench

@@ -2,8 +2,18 @@
 
 # --- Variables ---
 PYTHON = uv run python
-# Add src to PYTHONPATH so python -m can find the package
 HTE_CLI = PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
+
+# General Project Paths
+THIRD_PARTY_DIR = third-party
+
+# Repositories to clone
+THIRD_PARTY_REPOS = \
+    https://github.com/METR/eval-analysis-public.git \
+    https://github.com/princeton-nlp/intercode.git \
+    https://github.com/andyzorigin/cybench.git \
+    https://github.com/NYU-LLM-CTF/NYU_CTF_Bench.git \
+    https://github.com/TellinaTool/nl2bash.git
 
 # Dataset specific variables
 DATASET_NAME_KYPO = kypo
@@ -23,12 +33,17 @@ NL2BASH_METADATA_DIR = data/raw/nl2bash
 NL2BASH_PARSED_FILE = data/processed/nl2bash/all_tasks.jsonl
 NL2BASH_SUMMARIES_DIR = results/dataset-summaries/$(DATASET_NAME_NL2BASH)
 
+# InterCode specific variables
+
+# NYU-CTF specific variables
+
+# METR specific variables
+
 # Benchmark specific variables
 BENCHMARK_RESULTS_DIR = results/benchmarks
 CYBENCH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/cybench
 NL2BASH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/nl2bash
 MODEL ?= openai/gpt-4o-2024-05-13  # Default model for benchmarks
-MAX_ITERATIONS ?= 15
 NUM_RUNS ?= 2
 
 # Plot specific variables
@@ -36,7 +51,29 @@ PLOTS_DIR = results/plots
 SUCCESS_RATE ?= 0.5  # Default success rate threshold for horizon plots
 
 # Phony targets are targets that don't produce an output file with the same name
-.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark plot plot-cybench plot-nl2bash plot-all
+.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark plot plot-cybench plot-nl2bash plot-all third-party
+
+# --- Third-Party Repository Setup ---
+third-party:
+	@echo ">>> Checking and cloning third-party repositories into $(THIRD_PARTY_DIR)/"
+	@mkdir -p $(THIRD_PARTY_DIR)
+	@for repo_url in $(THIRD_PARTY_REPOS); do \
+		repo_name=$$(basename $$repo_url .git); \
+		target_dir=$(THIRD_PARTY_DIR)/$$repo_name; \
+		if [ "$$repo_name" = "cybench" ]; then \
+			: ; \
+		fi; \
+		if [ "$$(basename $$repo_url)" = "cybench.git" ]; then \
+			target_dir=$(THIRD_PARTY_DIR)/cybench; \
+		fi; \
+		if [ -d "$$target_dir" ]; then \
+			echo ">>> $$target_dir already exists. Skipping clone for $$repo_url."; \
+		else \
+			echo ">>> Cloning $$repo_url into $$target_dir..."; \
+			git clone --depth=1 $$repo_url $$target_dir; \
+		fi; \
+	done
+	@echo ">>> Third-party repositories setup complete."
 
 # --- Targets ---
 
@@ -82,7 +119,6 @@ help:
 	@echo "Variables:"
 	@echo "  CYBENCH_REPO_PATH   Path to CyBench repository clone (default: third-party/cybench)"
 	@echo "  MODEL               Model for benchmarks (default: openai/gpt-4o-2024-05-13)"
-	@echo "  MAX_ITERATIONS      Max iterations per task (default: 15)"
 	@echo "  NUM_RUNS            Number of runs for statistical analysis (default: 1)"
 	@echo "  SUCCESS_RATE        Success rate threshold for horizon plots (default: 0.5)"
 	@echo ""
@@ -91,7 +127,7 @@ help:
 	@echo "  make cybench-retrieve"
 	@echo "  make nl2bash-retrieve"
 	@echo "  make cybench-benchmark MODEL=anthropic/claude-3-5-sonnet-20240620"
-	@echo "  make cybench-benchmark-unguided MAX_ITERATIONS=10"
+	@echo "  make cybench-benchmark-unguided
 	@echo "  make plot SUCCESS_RATE=0.3"
 	@echo "  make plot-cybench SUCCESS_RATE=0.7"
 	@echo ""
@@ -116,7 +152,7 @@ kypo-summarise: $(PARSED_DATA_FILE_KYPO)
 	@mkdir -p $(SUMMARIES_DIR_KYPO)
 	$(HTE_CLI) summarise $(DATASET_NAME_KYPO) --jsonl-file $(PARSED_DATA_FILE_KYPO) --output-dir $(SUMMARIES_DIR_KYPO)
 
-cybench-retrieve:
+cybench-retrieve: third-party
 	@echo ">>> Retrieving CyBench metadata from local repository..."
 	@mkdir -p $(CYBENCH_METADATA_DIR)
 	$(HTE_CLI) retrieve metadata $(DATASET_NAME_CYBENCH) --output-dir $(CYBENCH_METADATA_DIR)
@@ -130,7 +166,7 @@ cybench-summarise: cybench-parse
 	@mkdir -p $(CYBENCH_SUMMARIES_DIR)
 	$(HTE_CLI) summarise $(DATASET_NAME_CYBENCH) --jsonl-file $(CYBENCH_PARSED_FILE) --output-dir $(CYBENCH_SUMMARIES_DIR)
 
-nl2bash-retrieve:
+nl2bash-retrieve: third-party
 	@echo ">>> Retrieving NL2Bash dataset and metadata..."
 	@mkdir -p $(NL2BASH_METADATA_DIR)
 	$(HTE_CLI) retrieve metadata $(DATASET_NAME_NL2BASH) --output-dir $(NL2BASH_METADATA_DIR)
@@ -171,7 +207,6 @@ cybench-setup-env: .env
 cybench-benchmark: cybench-setup-env
 	@echo ">>> Running CyBench benchmark evaluation..."
 	@echo ">>> Model: $(MODEL)"
-	@echo ">>> Max iterations: $(MAX_ITERATIONS)"
 	@echo ">>> Number of runs: $(NUM_RUNS)"
 	@echo ">>> Mode: Subtask (guided)"
 	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
@@ -184,7 +219,6 @@ cybench-benchmark: cybench-setup-env
 cybench-benchmark-unguided: cybench-setup-env
 	@echo ">>> Running CyBench benchmark evaluation (unguided mode)..."
 	@echo ">>> Model: $(MODEL)"
-	@echo ">>> Max iterations: $(MAX_ITERATIONS)"
 	@echo ">>> Number of runs: $(NUM_RUNS)"
 	@echo ">>> Mode: Unguided (single objective)"
 	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
