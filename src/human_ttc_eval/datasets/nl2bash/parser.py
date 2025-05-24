@@ -9,8 +9,6 @@ from typing import List, Dict, Any, Optional
 
 from ...core.base_parser import BaseParser
 from ...core.registry import register_parser
-from ...core.utils import slugify
-from .retrieve import get_data_files
 from ...config import (
     ENABLE_LLM_TIMING, 
     NL2BASH_LLM_PROVIDER, 
@@ -49,18 +47,42 @@ class NL2BashParser(BaseParser):
         return "nl2bash"
 
     def __init__(self, input_dir: Path, output_file: Path, 
-                 atomic_only: bool = False, use_llm_timing: bool = None):
+                 atomic_only: bool = False, use_llm_timing: bool = None,
+                 sample_size: Optional[int] = 100, random_seed: int = 42):
         """
         Args:
             input_dir: Directory containing NL2Bash data (not used directly, data comes from third-party)
             output_file: Output path for the all_runs.jsonl file
             atomic_only: If True, only include atomic (simple) commands
             use_llm_timing: If True, use LLM for time estimation. If None, use global setting.
+            sample_size: If set, randomly sample this many tasks. If None, use all tasks.
+            random_seed: Seed for reproducible random sampling
         """
         super().__init__(input_dir, output_file)
         self.atomic_only = atomic_only
         self.use_llm_timing = use_llm_timing if use_llm_timing is not None else ENABLE_LLM_TIMING
-        logger.info(f"NL2BashParser initialized. Atomic only: {atomic_only}, LLM timing: {self.use_llm_timing}")
+        self.sample_size = sample_size
+        self.random_seed = random_seed
+        logger.info(f"NL2BashParser initialized. Atomic only: {atomic_only}, LLM timing: {self.use_llm_timing}, Sample size: {sample_size}, Seed: {random_seed}")
+
+    def _get_data_files(self) -> tuple[Path, Path]:
+        """Get paths to the NL2Bash data files.
+        
+        Returns:
+            Tuple of (nl_file_path, cm_file_path)
+        """
+        # NL2Bash data is in third-party/nl2bash/data/bash/
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        repo_path = project_root / "third-party" / "nl2bash"
+        data_path = repo_path / "data" / "bash"
+        
+        nl_file = data_path / "all.nl"
+        cm_file = data_path / "all.cm"
+        
+        if not nl_file.exists() or not cm_file.exists():
+            raise FileNotFoundError(f"NL2Bash data files not found. Expected: {nl_file}, {cm_file}")
+        
+        return nl_file, cm_file
 
     def parse(self) -> List[Dict[str, Any]]:
         """
@@ -96,7 +118,7 @@ class NL2BashParser(BaseParser):
 
     def _load_and_analyze_tasks(self) -> List[NL2BashTask]:
         """Load NL2Bash data files and create analyzed task objects."""
-        nl_file, cm_file = get_data_files()
+        nl_file, cm_file = self._get_data_files()
         tasks = []
         
         with open(nl_file, 'r', encoding='utf-8') as nf, \
@@ -118,7 +140,105 @@ class NL2BashParser(BaseParser):
                 task = self._analyze_command(task_id, nl_description, bash_command)
                 tasks.append(task)
         
+        # Apply stratified sampling by complexity if requested
+        if self.sample_size is not None and len(tasks) > self.sample_size:
+            tasks = self._stratified_sample_by_complexity(tasks)
+        
         return tasks
+
+    def _stratified_sample_by_complexity(self, tasks: List[NL2BashTask]) -> List[NL2BashTask]:
+        """Perform stratified sampling by complexity groups with balanced representation."""
+        import random
+        from collections import defaultdict
+        
+        random.seed(self.random_seed)
+        original_count = len(tasks)
+        
+        # Group tasks by complexity category
+        complexity_groups = defaultdict(list)
+        for task in tasks:
+            category = self._get_complexity_category(task.complexity_score)
+            complexity_groups[category].append(task)
+        
+        # Sort categories for consistent ordering
+        categories = sorted(complexity_groups.keys())
+        num_categories = len(categories)
+        
+        # Calculate more balanced sample sizes
+        # Give each category a base allocation, then distribute remainder proportionally
+        base_per_category = max(5, self.sample_size // (num_categories * 2))  # At least 5 per category
+        base_total = base_per_category * num_categories
+        remainder = max(0, self.sample_size - base_total)
+        
+        sampled_tasks = []
+        group_info = []
+        
+        # First pass: give each category the base allocation
+        for category in categories:
+            group_tasks = complexity_groups[category]
+            group_size = len(group_tasks)
+            
+            # Take base allocation (or all tasks if group is smaller)
+            sample_size = min(base_per_category, group_size)
+            
+            if sample_size >= group_size:
+                group_sample = group_tasks
+            else:
+                group_sample = random.sample(group_tasks, sample_size)
+            
+            sampled_tasks.extend(group_sample)
+            group_info.append((category, len(group_sample), group_size))
+        
+        # Second pass: distribute remainder proportionally among groups with remaining tasks
+        if remainder > 0:
+            # Calculate how many more tasks each group can contribute
+            available_groups = []
+            for category, sampled_count, total_count in group_info:
+                remaining = total_count - sampled_count
+                if remaining > 0:
+                    # Weight by log of group size to balance between common and rare groups
+                    import math
+                    weight = math.log(remaining + 1)
+                    available_groups.append((category, remaining, weight))
+            
+            if available_groups:
+                # Distribute remainder based on weighted availability
+                total_weight = sum(weight for _, _, weight in available_groups)
+                
+                for category, remaining, weight in available_groups:
+                    if remainder <= 0:
+                        break
+                    
+                    # Calculate additional samples for this group
+                    proportion = weight / total_weight
+                    additional = min(remaining, max(1, int(remainder * proportion)))
+                    
+                    if additional > 0:
+                        group_tasks = complexity_groups[category]
+                        current_sample = [t for t in sampled_tasks if self._get_complexity_category(t.complexity_score) == category]
+                        available_tasks = [t for t in group_tasks if t not in current_sample]
+                        
+                        if available_tasks:
+                            extra_sample = random.sample(available_tasks, min(additional, len(available_tasks)))
+                            sampled_tasks.extend(extra_sample)
+                            remainder -= len(extra_sample)
+                            
+                            # Update group_info
+                            for i, (cat, count, total) in enumerate(group_info):
+                                if cat == category:
+                                    group_info[i] = (cat, count + len(extra_sample), total)
+                                    break
+        
+        # Shuffle the final result to mix complexity groups
+        random.shuffle(sampled_tasks)
+        
+        # Format group info for logging
+        group_info_str = ', '.join(f"{cat}: {count}/{total}" for cat, count, total in group_info)
+        
+        logger.info(f"Balanced stratified sampling: {len(sampled_tasks)} tasks from {original_count}")
+        logger.info(f"Complexity distribution: {group_info_str} (seed: {self.random_seed})")
+        
+        return sampled_tasks
 
     def _analyze_command(self, task_id: int, nl_description: str, bash_command: str) -> NL2BashTask:
         """Analyze a bash command and create a task object."""

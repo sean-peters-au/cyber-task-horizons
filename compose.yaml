@@ -1,8 +1,0 @@
-services:
-  default:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    init: true # Enable proper PID 1 behavior
-    entrypoint: ["inspect-tool-support", "serve"]
-    # The server will run indefinitely to handle RPC calls for sandbox exec 

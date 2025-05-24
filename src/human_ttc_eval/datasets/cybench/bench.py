@@ -265,9 +265,12 @@ class CyBenchBench(BaseBench):
             logger.warning(f"CyBench logs directory not found: {logs_dir}")
             return task_results, {}
         
-        # Find all log files for this model
-        model_slug = model_name.replace("/", "_")
-        log_files = list(logs_dir.glob(f"**/*{model_slug}*.json"))
+        # Extract model name from full model path (e.g., "anthropic/claude-3-5-haiku-20241022" -> "claude-3-5-haiku-20241022")
+        model_basename = model_name.split("/")[-1]
+        
+        # Find all log files for this model using the model basename in filename
+        # CyBench stores logs as: logs/{task}/{provider}/{model}/{timestamp}/{provider}/{model}_*.json
+        log_files = list(logs_dir.glob(f"**/{model_basename}_*.json"))
         
         logger.info(f"Found {len(log_files)} CyBench log files for model {model_name}")
         

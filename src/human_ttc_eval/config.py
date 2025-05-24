@@ -27,7 +27,7 @@ LLM_MAX_TOKENS = 4096
 LLM_TEMPERATURE = 0.1
 
 # NL2Bash Configuration
-ENABLE_LLM_TIMING = True  # Set to False to skip LLM time estimation
+ENABLE_LLM_TIMING = False  # Set to False to skip LLM time estimation
 NL2BASH_LLM_PROVIDER = 'anthropic'
 NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100

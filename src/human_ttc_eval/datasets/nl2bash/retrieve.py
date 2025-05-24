@@ -3,7 +3,7 @@
 import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from human_ttc_eval.core.base_retriever import BaseRetriever
 from human_ttc_eval.core.registry import register_retriever
@@ -15,13 +15,18 @@ logger = logging.getLogger(__name__)
 class NL2BashRetriever(BaseRetriever):
     """Retriever for NL2Bash dataset."""
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    @property
+    def dataset_name(self) -> str:
+        """Returns the dataset name."""
+        return "nl2bash"
+    
+    def __init__(self, output_dir: Path, **kwargs):
+        super().__init__(output_dir)
         self.project_root = Path(__file__).parent.parent.parent.parent.parent
         self.repo_path = self.project_root / "third-party" / "nl2bash"
         self.data_path = self.repo_path / "data" / "bash"
     
-    def retrieve_metadata(self) -> Dict[str, Any]:
+    def retrieve_metadata(self, **kwargs) -> Optional[Path]:
         """Retrieve metadata about the NL2Bash dataset."""
         self._ensure_dataset()
         
@@ -51,16 +56,21 @@ class NL2BashRetriever(BaseRetriever):
         else:
             logger.warning("✗ Parallel files have different line counts")
         
-        return metadata
+        # Save metadata to output directory
+        metadata_file = self.output_dir / "nl2bash_metadata.json"
+        import json
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        return metadata_file
     
-    def download_challenge_content(self, challenge_id: str, output_dir: Path) -> Optional[Path]:
+    def download_challenge_content(self, metadata_file: Path, **kwargs) -> None:
         """Download content for a specific challenge.
         
         For NL2Bash, this is not applicable as it's a paired dataset.
         Individual examples are extracted during parsing.
         """
         logger.warning("NL2Bash does not support individual challenge downloads")
-        return None
     
     def _ensure_dataset(self) -> None:
         """Ensure NL2Bash dataset is available, downloading if necessary."""
@@ -98,6 +108,6 @@ class NL2BashRetriever(BaseRetriever):
 
 
 if __name__ == "__main__":
-    retriever = NL2BashRetriever()
-    metadata = retriever.retrieve_metadata()
-    print(f"Dataset metadata: {metadata}") 
+    retriever = NL2BashRetriever(output_dir=Path("test_output"))
+    metadata_file = retriever.retrieve_metadata()
+    print(f"Dataset metadata saved to: {metadata_file}") 

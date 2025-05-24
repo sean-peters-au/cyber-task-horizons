@@ -2,6 +2,7 @@ from typing import Dict, Type, Callable, List
 from .base_parser import BaseParser
 from .base_summariser import BaseSummariser
 from .base_retriever import BaseRetriever
+from .base_bench import BaseBench
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 _parsers: Dict[str, Type[BaseParser]] = {}
 _summarisers: Dict[str, Type[BaseSummariser]] = {}
 _retrievers: Dict[str, Type[BaseRetriever]] = {}
+_benches: Dict[str, Type[BaseBench]] = {}
 
 def register_parser(name: str) -> Callable[[Type[BaseParser]], Type[BaseParser]]:
     """Decorator to register a parser class."""
@@ -66,4 +68,23 @@ def get_retriever(name: str) -> Type[BaseRetriever]:
 
 def list_retrievers() -> List[str]:
     """List all registered retriever names."""
-    return list(_retrievers.keys()) 
+    return list(_retrievers.keys())
+
+def register_bench(name: str) -> Callable[[Type[BaseBench]], Type[BaseBench]]:
+    """Decorator to register a bench class."""
+    def decorator(cls: Type[BaseBench]) -> Type[BaseBench]:
+        if name in _benches:
+            logger.warning(f"Bench '{name}' already registered. Overwriting.")
+        _benches[name] = cls
+        return cls
+    return decorator
+
+def get_bench(name: str) -> Type[BaseBench]:
+    """Get a registered bench class by name."""
+    if name not in _benches:
+        raise ValueError(f"Bench '{name}' not found. Available benches: {list(_benches.keys())}")
+    return _benches[name]
+
+def list_benches() -> List[str]:
+    """List all registered bench names."""
+    return list(_benches.keys()) 

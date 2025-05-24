@@ -26,11 +26,12 @@ NL2BASH_SUMMARIES_DIR = results/dataset-summaries/$(DATASET_NAME_NL2BASH)
 # Benchmark specific variables
 BENCHMARK_RESULTS_DIR = results/benchmarks
 CYBENCH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/cybench
+NL2BASH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/nl2bash
 MODEL ?= openai/gpt-4o-2024-05-13  # Default model for benchmarks
 MAX_ITERATIONS ?= 15
 
 # Phony targets are targets that don't produce an output file with the same name
-.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise
+.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark
 
 # --- Targets ---
 
@@ -59,6 +60,7 @@ help:
 	@echo "  nl2bash-retrieve    Download NL2Bash dataset and extract metadata"
 	@echo "  nl2bash-parse       Parse NL2Bash dataset into METR all_runs.jsonl format"
 	@echo "  nl2bash-summarise   Generate summaries and statistics from NL2Bash data"
+	@echo "  nl2bash-benchmark   Run NL2Bash benchmark evaluation"
 	@echo ""
 	@echo "Benchmark targets:"
 	@echo "  cybench-setup-env         Sync API keys to CyBench directory"
@@ -126,6 +128,14 @@ nl2bash-summarise: nl2bash-parse
 	@echo ">>> Summarising NL2Bash dataset using CLI..."
 	@mkdir -p $(NL2BASH_SUMMARIES_DIR)
 	$(HTE_CLI) summarise $(DATASET_NAME_NL2BASH) --jsonl-file $(NL2BASH_PARSED_FILE) --output-dir $(NL2BASH_SUMMARIES_DIR)
+
+nl2bash-benchmark:
+	@echo ">>> Running NL2Bash benchmark evaluation..."
+	@echo ">>> Model: $(MODEL)"
+	@mkdir -p $(NL2BASH_BENCHMARK_DIR)
+	$(HTE_CLI) benchmark nl2bash \
+		--model $(MODEL) \
+		--output-dir $(NL2BASH_BENCHMARK_DIR)
 
 cybench-setup-env: .env
 	@echo ">>> Syncing API keys to CyBench directory..."

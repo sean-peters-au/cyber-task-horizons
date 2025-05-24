@@ -173,14 +173,8 @@ def cli_retrieve_metadata(dataset_name: str, output_dir: str):
             retriever_instance = retriever_class(output_dir=output_path, cybench_repo_path=CYBENCH_REPO_PATH)
             result = retriever_instance.retrieve_metadata()
         elif dataset_name == "nl2bash":
-            retriever_instance = retriever_class()
+            retriever_instance = retriever_class(output_dir=output_path)
             result = retriever_instance.retrieve_metadata()
-            # Save nl2bash metadata to JSON file
-            metadata_file = output_path / "nl2bash_metadata.json"
-            import json
-            with open(metadata_file, 'w') as f:
-                json.dump(result, f, indent=2)
-            result = metadata_file
         else:
             click.echo(f"Unsupported dataset: {dataset_name}", err=True)
             return
@@ -263,6 +257,54 @@ def cli_benchmark_cybench(model: str, output_dir: str,
     except Exception as e:
         click.echo(f"An unexpected error occurred: {e}", err=True)
         logger.error(f"Unexpected error during cybench benchmark: {e}", exc_info=True)
+
+@cli_benchmark.command("nl2bash")
+@click.option("--model", required=True, 
+              help="Model to evaluate (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')")
+@click.option("--output-dir", default="results/benchmarks/nl2bash", 
+              help="Directory to save benchmark results.")
+def cli_benchmark_nl2bash(model: str, output_dir: str):
+    """Run NL2Bash benchmark evaluation on the specified model."""
+    logger.info(f"CLI benchmark nl2bash initiated for model: {model}")
+    
+    try:
+        from .datasets.nl2bash.bench import NL2BashBench
+        
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize benchmark runner
+        bench = NL2BashBench(output_dir=output_path)
+        
+        # Run evaluation
+        result = bench.run_evaluation(model_name=model)
+        
+        if result.success:
+            stats = result.summary_stats
+            click.echo(f"✅ NL2Bash evaluation completed successfully!")
+            click.echo(f"Tasks completed: {stats['total_tasks']}")
+            click.echo(f"Successful tasks: {stats['successful_tasks']}")
+            click.echo(f"Success rate: {stats['success_rate']:.1%}")
+            click.echo(f"Average LLM score: {stats['average_llm_score']:.3f}")
+            
+            # Show complexity breakdown
+            if stats.get('complexity_breakdown'):
+                click.echo("\nComplexity breakdown:")
+                for category, breakdown in stats['complexity_breakdown'].items():
+                    click.echo(f"  {category}: {breakdown['successful']}/{breakdown['total']} "
+                             f"({breakdown['success_rate']:.1%})")
+            
+            click.echo(f"Results saved to: {output_path}")
+        else:
+            click.echo(f"❌ NL2Bash evaluation failed: {result.error_message}", err=True)
+            
+    except ImportError as e:
+        click.echo(f"Error: NL2Bash or inspect_ai module not available: {e}", err=True)
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+    except Exception as e:
+        logger.error(f"Unexpected error during nl2bash benchmark: {e}", exc_info=True)
+        click.echo(f"Unexpected error: {e}", err=True)
 
 if __name__ == "__main__":
     # This makes the CLI runnable when you execute the script directly
