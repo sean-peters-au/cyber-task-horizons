@@ -1,4 +1,13 @@
-"""Simple configuration for the Human TTC Evaluation project."""
+"""
+Simple configuration for the Human TTC Evaluation project.
+
+Configuration Principles:
+- User-configurable parameters that might be tuned across different runs go in this config.py file
+- Implementation constants that never change should be defined as constants at the top of 
+  the relevant module (e.g., DEFAULT_UNGUIDED_MODE in bench.py files)
+- Dataset-specific CLI arguments should be avoided - the CLI should be completely generic
+- All configuration should be centralized here to maintain clean separation of concerns
+"""
 
 import os
 from pathlib import Path
@@ -31,6 +40,12 @@ ENABLE_LLM_TIMING = False  # Set to False to skip LLM time estimation
 NL2BASH_LLM_PROVIDER = 'anthropic'
 NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100
+
+# CyBench Configuration (user-tunable parameters)
+CYBENCH_MAX_ITERATIONS = 15  # Maximum iterations per task - users may want to adjust this
+CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
+CYBENCH_MAX_OUTPUT_TOKENS = 2000
+CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups
 
 # Project Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent

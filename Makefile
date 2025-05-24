@@ -29,9 +29,14 @@ CYBENCH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/cybench
 NL2BASH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/nl2bash
 MODEL ?= openai/gpt-4o-2024-05-13  # Default model for benchmarks
 MAX_ITERATIONS ?= 15
+NUM_RUNS ?= 2
+
+# Plot specific variables
+PLOTS_DIR = results/plots
+SUCCESS_RATE ?= 0.5  # Default success rate threshold for horizon plots
 
 # Phony targets are targets that don't produce an output file with the same name
-.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark
+.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark plot plot-cybench plot-nl2bash plot-all
 
 # --- Targets ---
 
@@ -47,6 +52,7 @@ help:
 	@echo "  help                Display this help message"
 	@echo "  datasets            Process all supported datasets (KYPO, CyBench, NL2Bash)"
 	@echo "  benchmark           Run benchmarks on all datasets"
+	@echo "  plot                Generate horizon plots from benchmark results"
 	@echo "  docs                Generate documentation"
 	@echo "  bench               Run benchmarks (alias for benchmark)"
 	@echo "  clean               Remove all generated files"
@@ -67,10 +73,18 @@ help:
 	@echo "  cybench-benchmark         Run CyBench evaluation with subtasks (default model)"
 	@echo "  cybench-benchmark-unguided Run CyBench evaluation in unguided mode"
 	@echo ""
+	@echo "Plotting targets:"
+	@echo "  plot                Generate horizon plots for all datasets"
+	@echo "  plot-cybench        Generate horizon plots for CyBench only"
+	@echo "  plot-nl2bash        Generate horizon plots for NL2Bash only"
+	@echo "  plot-all            Generate horizon plots at multiple success rates"
+	@echo ""
 	@echo "Variables:"
 	@echo "  CYBENCH_REPO_PATH   Path to CyBench repository clone (default: third-party/cybench)"
 	@echo "  MODEL               Model for benchmarks (default: openai/gpt-4o-2024-05-13)"
 	@echo "  MAX_ITERATIONS      Max iterations per task (default: 15)"
+	@echo "  NUM_RUNS            Number of runs for statistical analysis (default: 1)"
+	@echo "  SUCCESS_RATE        Success rate threshold for horizon plots (default: 0.5)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make kypo-parse"
@@ -78,6 +92,8 @@ help:
 	@echo "  make nl2bash-retrieve"
 	@echo "  make cybench-benchmark MODEL=anthropic/claude-3-5-sonnet-20240620"
 	@echo "  make cybench-benchmark-unguided MAX_ITERATIONS=10"
+	@echo "  make plot SUCCESS_RATE=0.3"
+	@echo "  make plot-cybench SUCCESS_RATE=0.7"
 	@echo ""
 
 # Main target to process all datasets (KYPO, CyBench, and NL2Bash)
@@ -129,14 +145,6 @@ nl2bash-summarise: nl2bash-parse
 	@mkdir -p $(NL2BASH_SUMMARIES_DIR)
 	$(HTE_CLI) summarise $(DATASET_NAME_NL2BASH) --jsonl-file $(NL2BASH_PARSED_FILE) --output-dir $(NL2BASH_SUMMARIES_DIR)
 
-nl2bash-benchmark:
-	@echo ">>> Running NL2Bash benchmark evaluation..."
-	@echo ">>> Model: $(MODEL)"
-	@mkdir -p $(NL2BASH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark nl2bash \
-		--model $(MODEL) \
-		--output-dir $(NL2BASH_BENCHMARK_DIR)
-
 cybench-setup-env: .env
 	@echo ">>> Syncing API keys to CyBench directory..."
 	@if [ ! -f .env ]; then \
@@ -164,24 +172,78 @@ cybench-benchmark: cybench-setup-env
 	@echo ">>> Running CyBench benchmark evaluation..."
 	@echo ">>> Model: $(MODEL)"
 	@echo ">>> Max iterations: $(MAX_ITERATIONS)"
+	@echo ">>> Number of runs: $(NUM_RUNS)"
 	@echo ">>> Mode: Subtask (guided)"
 	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark cybench \
+	$(HTE_CLI) benchmark \
+		--dataset cybench \
 		--model $(MODEL) \
 		--output-dir $(CYBENCH_BENCHMARK_DIR) \
-		--max-iterations $(MAX_ITERATIONS)
+		--num-runs $(NUM_RUNS)
 
 cybench-benchmark-unguided: cybench-setup-env
 	@echo ">>> Running CyBench benchmark evaluation (unguided mode)..."
 	@echo ">>> Model: $(MODEL)"
 	@echo ">>> Max iterations: $(MAX_ITERATIONS)"
+	@echo ">>> Number of runs: $(NUM_RUNS)"
 	@echo ">>> Mode: Unguided (single objective)"
 	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark cybench \
+	$(HTE_CLI) benchmark \
+		--dataset cybench \
 		--model $(MODEL) \
 		--output-dir $(CYBENCH_BENCHMARK_DIR) \
-		--max-iterations $(MAX_ITERATIONS) \
-		--unguided-mode
+		--num-runs $(NUM_RUNS)
+
+nl2bash-benchmark:
+	@echo ">>> Running NL2Bash benchmark evaluation..."
+	@echo ">>> Model: $(MODEL)"
+	@echo ">>> Number of runs: $(NUM_RUNS)"
+	@mkdir -p $(NL2BASH_BENCHMARK_DIR)
+	$(HTE_CLI) benchmark \
+		--dataset nl2bash \
+		--model $(MODEL) \
+		--output-dir $(NL2BASH_BENCHMARK_DIR) \
+		--num-runs $(NUM_RUNS)
+
+plot:
+	@echo ">>> Generating horizon plots for all datasets..."
+	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_DIR)
+	$(HTE_CLI) plot \
+		--results-dir $(BENCHMARK_RESULTS_DIR) \
+		--output-dir $(PLOTS_DIR) \
+		--success-rate $(SUCCESS_RATE)
+
+plot-cybench:
+	@echo ">>> Generating horizon plots for CyBench dataset..."
+	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_DIR)
+	$(HTE_CLI) plot \
+		--results-dir $(BENCHMARK_RESULTS_DIR) \
+		--output-dir $(PLOTS_DIR) \
+		--dataset cybench \
+		--success-rate $(SUCCESS_RATE)
+
+plot-nl2bash:
+	@echo ">>> Generating horizon plots for NL2Bash dataset..."
+	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_DIR)
+	$(HTE_CLI) plot \
+		--results-dir $(BENCHMARK_RESULTS_DIR) \
+		--output-dir $(PLOTS_DIR) \
+		--dataset nl2bash \
+		--success-rate $(SUCCESS_RATE)
+
+plot-all:
+	@echo ">>> Generating horizon plots at multiple success rates..."
+	@mkdir -p $(PLOTS_DIR)
+	@for rate in 0.3 0.5 0.7 0.9; do \
+		echo ">>> Generating plots at $${rate} success rate..."; \
+		$(HTE_CLI) plot \
+			--results-dir $(BENCHMARK_RESULTS_DIR) \
+			--output-dir $(PLOTS_DIR) \
+			--success-rate $$rate; \
+	done
 
 docs: datasets
 	@echo ">>> Building Sphinx documentation..."
@@ -204,10 +266,15 @@ clean_benchmarks:
 	rm -rf $(BENCHMARK_RESULTS_DIR)
 	@echo "Benchmark results cleaned."
 
+clean_plots:
+	@echo ">>> Cleaning generated plots..."
+	rm -rf $(PLOTS_DIR)
+	@echo "Generated plots cleaned."
+
 clean_docs:
 	@echo ">>> Cleaning Sphinx build directory..."
 	rm -rf docs/build
 	@echo "Sphinx build directory cleaned."
 
-clean: clean_datasets clean_benchmarks clean_docs
+clean: clean_datasets clean_benchmarks clean_plots clean_docs
 	@echo "All generated files cleaned." 

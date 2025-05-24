@@ -6,6 +6,7 @@ import re
 
 from ...core.base_retriever import BaseRetriever
 from ...core.registry import register_retriever
+from ...config import CYBENCH_REPO_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +18,13 @@ class CyBenchRetriever(BaseRetriever):
     def dataset_name(self) -> str:
         return "cybench"
 
-    def __init__(self, output_dir: Path, cybench_repo_path: Path):
+    def __init__(self, output_dir: Path):
         """
         Args:
             output_dir: Directory to save the processed metadata JSONL file.
-            cybench_repo_path: Path to the locally cloned cybench repository.
         """
         super().__init__(output_dir)
-        self.cybench_repo_path = Path(cybench_repo_path)
+        self.cybench_repo_path = Path(CYBENCH_REPO_PATH)
         if not self.cybench_repo_path.is_dir():
             # Log a warning but allow initialization; retrieve_metadata will fail more explicitly.
             logger.warning(f"CyBench repository path does not exist or is not a directory: {self.cybench_repo_path}")

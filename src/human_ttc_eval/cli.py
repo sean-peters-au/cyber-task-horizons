@@ -10,19 +10,16 @@ try:
     from .datasets.cybench import retrieve as cybench_retrieve_module # noqa
     from .datasets.cybench import parser as cybench_parser_module # noqa
     from .datasets.cybench import summariser as cybench_summariser_module # noqa
+    from .datasets.cybench import bench as cybench_bench_module # noqa
     from .datasets.nl2bash import retrieve as nl2bash_retrieve_module # noqa
     from .datasets.nl2bash import parser as nl2bash_parser_module # noqa
     from .datasets.nl2bash import summariser as nl2bash_summariser_module # noqa
+    from .datasets.nl2bash import bench as nl2bash_bench_module # noqa
 except ImportError as e:
     print(f"Warning: Could not import all dataset modules: {e}. Some commands might fail.", file=sys.stderr)
 
 from .core.registry import get_parser, list_parsers, get_summariser, list_summarisers, get_retriever, list_retrievers
 
-# Import benchmark modules
-try:
-    from .datasets.cybench import bench as cybench_bench_module # noqa
-except ImportError as e:
-    print(f"Warning: Could not import benchmark modules: {e}. Some commands might fail.", file=sys.stderr)
 
 # Configure basic logging for the CLI
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
@@ -77,7 +74,7 @@ def cli_parse(dataset_name: str, input_dir: str, output_file: str):
             logger.warning(f"Parsing {dataset_name} returned None. No output written.")
             click.echo(f"Parsing {dataset_name} did not produce data. No output written.", err=True)
 
-    except ValueError as e: # Specific for get_parser not found
+    except ValueError as e:
         click.echo(f"Error: {e}", err=True)
         logger.error(f"ValueError during parse setup for '{dataset_name}': {e}")
     except Exception as e:
@@ -114,18 +111,15 @@ def cli_summarise(dataset_name: str, jsonl_file: str, output_dir: str):
         jsonl_path = Path(jsonl_file)
         output_dir_path = Path(output_dir)
 
-        # Ensure output directory exists; BaseSummariser also does this, but good practice here too.
-        output_dir_path.mkdir(parents=True, exist_ok=True)
-
         summariser_instance = summariser_class(jsonl_file_path=jsonl_path, output_dir=output_dir_path)
         
         click.echo(f"Starting summarisation for dataset: {dataset_name}...")
-        summariser_instance.load_data() # Loads data into summariser_instance.df
-        summariser_instance.summarise()   # Generates stats (e.g., CSVs)
-        summariser_instance.save_plots()  # Generates plots
+        summariser_instance.load_data()
+        summariser_instance.summarise()
+        summariser_instance.save_plots()
         click.echo(f"Successfully summarised {dataset_name}. Outputs saved to {output_dir_path}")
 
-    except ValueError as e: # Specific for get_summariser not found
+    except ValueError as e:
         click.echo(f"Error: {e}", err=True)
         logger.error(f"ValueError during summarise setup for '{dataset_name}': {e}")
     except Exception as e:
@@ -160,22 +154,13 @@ def cli_retrieve_metadata(dataset_name: str, output_dir: str):
     """Retrieve metadata for any supported dataset."""
     logger.info(f"CLI retrieve metadata initiated for dataset: '{dataset_name}'")
     try:
-        from .config import CYBENCH_REPO_PATH
-        
         retriever_class = get_retriever(dataset_name)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
-        # Handle dataset-specific initialization
-        if dataset_name == "cybench":
-            retriever_instance = retriever_class(output_dir=output_path, cybench_repo_path=CYBENCH_REPO_PATH)
-            result = retriever_instance.retrieve_metadata()
-        elif dataset_name == "nl2bash":
-            retriever_instance = retriever_class(output_dir=output_path)
-            result = retriever_instance.retrieve_metadata()
-        else:
-            click.echo(f"Unsupported dataset: {dataset_name}", err=True)
-            return
+        # Initialize retriever (all datasets use standard interface)
+        retriever_instance = retriever_class(output_dir=output_path)
+        result = retriever_instance.retrieve_metadata()
 
         click.echo(f"Successfully retrieved {dataset_name} metadata to: {result}")
 
@@ -186,30 +171,40 @@ def cli_retrieve_metadata(dataset_name: str, output_dir: str):
         click.echo(f"An unexpected error occurred during {dataset_name} metadata retrieval: {e}", err=True)
         logger.error(f"Unexpected error during {dataset_name} metadata retrieval: {e}", exc_info=True)
 
-@cli.group("benchmark") 
-def cli_benchmark():
-    """Commands for running AI model evaluations on datasets."""
-    pass
-
-@cli_benchmark.command("cybench")
+@cli.command("benchmark")
+@click.option("--dataset", required=True,
+              help="Dataset to benchmark (e.g., 'cybench', 'nl2bash')")
 @click.option("--model", required=True, 
-              help="Model identifier (e.g., 'openai/gpt-4o-2024-05-13'). See CyBench docs for full list.")
+              help="Model identifier (e.g., 'openai/gpt-4o-2024-05-13', 'anthropic/claude-3-sonnet')")
 @click.option("--output-dir", "-o", required=True,
               type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
               help="Directory to save benchmark results.")
+@click.option("--num-runs", default=1, type=int,
+              help="Number of evaluation runs for statistical analysis. Default: 1.")
 @click.option("--tasks", 
               help="Comma-separated list of specific tasks to run. If not provided, runs all tasks.")
-@click.option("--max-iterations", default=15, type=int,
-              help="Maximum iterations per task.")
-@click.option("--unguided-mode", is_flag=True, default=False,
-              help="Run in unguided mode (single objective, no subtasks).")
-def cli_benchmark_cybench(model: str, output_dir: str, 
-                         tasks: Optional[str], max_iterations: int, unguided_mode: bool):
-    """Run CyBench evaluation using their native system."""
-    logger.info(f"CLI benchmark cybench initiated for model: {model}")
+def cli_benchmark(dataset: str, model: str, output_dir: str, num_runs: int, tasks: Optional[str]):
+    """Run benchmark evaluation on any supported dataset."""
+    logger.info(f"CLI benchmark initiated for dataset: {dataset}, model: {model}")
+    
     try:
-        from .datasets.cybench.bench import CyBenchBench
-        from .config import CYBENCH_REPO_PATH
+        # Import benchmark registry
+        from .core.registry import get_bench, list_benches
+        
+        # Get the appropriate benchmark class
+        try:
+            bench_class = get_bench(dataset)
+        except ValueError as e:
+            available = ", ".join(list_benches())
+            click.echo(f"Error: {e}", err=True)
+            click.echo(f"Available datasets: {available}", err=True)
+            return
+        
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize benchmark runner (all datasets use standard interface)
+        bench = bench_class(output_dir=output_path)
         
         # Parse tasks if provided
         task_list = None
@@ -219,93 +214,138 @@ def cli_benchmark_cybench(model: str, output_dir: str,
         else:
             click.echo("Running evaluation on all available tasks")
         
-        # Initialize benchmark runner
-        bench = CyBenchBench(
-            output_dir=Path(output_dir),
-            cybench_repo_path=CYBENCH_REPO_PATH
-        )
-        
-        # Validate model
-        if not bench.validate_model_name(model):
-            available = ", ".join(bench.AVAILABLE_MODELS)
-            click.echo(f"Error: Model '{model}' not supported by CyBench.", err=True)
-            click.echo(f"Available models: {available}", err=True)
+        # Validate model if the benchmark supports it
+        if hasattr(bench, 'validate_model_name') and not bench.validate_model_name(model):
+            if hasattr(bench, 'AVAILABLE_MODELS'):
+                available = ", ".join(bench.AVAILABLE_MODELS)
+                click.echo(f"Error: Model '{model}' not supported by {dataset}.", err=True)
+                click.echo(f"Available models: {available}", err=True)
+            else:
+                click.echo(f"Error: Model '{model}' not supported by {dataset}.", err=True)
             return
         
-        click.echo(f"Starting CyBench evaluation for model: {model}")
-        click.echo(f"This may take a while (up to 2 hours)...")
+        click.echo(f"Starting {dataset} evaluation for model: {model}")
+        if num_runs > 1:
+            click.echo(f"Running {num_runs} evaluation runs for statistical analysis...")
+        click.echo(f"This may take a while...")
         
-        # Run evaluation
-        result = bench.run_evaluation(
-            model_name=model,
-            tasks=task_list,
-            max_iterations=max_iterations,
-            unguided_mode=unguided_mode
-        )
-        
-        if result.success:
-            click.echo(f"✅ Evaluation completed successfully!")
-            click.echo(f"📊 Results: {result.summary_stats['successful_tasks']}/{result.summary_stats['total_tasks']} tasks successful")
-            click.echo(f"📁 Detailed results saved to: {output_dir}")
-        else:
-            click.echo(f"❌ Evaluation failed: {result.error_message}", err=True)
+        # Run evaluation multiple times (each saves its own timestamped file)
+        successful_runs = 0
+        for run_num in range(1, num_runs + 1):
+            if num_runs > 1:
+                click.echo(f"\n--- Run {run_num}/{num_runs} ---")
             
+            result = bench.run_evaluation(model_name=model, tasks=task_list)
+            
+            if result.success:
+                successful_runs += 1
+                if num_runs == 1:
+                    stats = result.summary_stats
+                    click.echo(f"✅ {dataset.title()} evaluation completed successfully!")
+                    click.echo(f"📊 Results: {stats.get('successful_tasks', 0)}/{stats.get('total_tasks', 0)} tasks successful")
+                else:
+                    click.echo(f"✅ Run {run_num} completed successfully")
+            else:
+                click.echo(f"❌ Run {run_num} failed: {result.error_message}")
+        
+        # Summary for multiple runs
+        if num_runs > 1:
+            click.echo(f"\n🏁 Multi-run summary: {successful_runs}/{num_runs} runs successful")
+            click.echo(f"📁 Individual run results saved to: {output_path}")
+            if successful_runs == 0:
+                click.echo(f"❌ All {num_runs} runs failed", err=True)
+        else:
+            if result.success:
+                click.echo(f"📁 Results saved to: {output_path}")
+            else:
+                click.echo(f"❌ {dataset.title()} evaluation failed: {result.error_message}", err=True)
+
     except ImportError as e:
-        click.echo(f"Error: Could not import CyBenchBench: {e}", err=True)
+        click.echo(f"Error: Could not import {dataset} benchmark: {e}", err=True)
     except Exception as e:
         click.echo(f"An unexpected error occurred: {e}", err=True)
-        logger.error(f"Unexpected error during cybench benchmark: {e}", exc_info=True)
+        logger.error(f"Unexpected error during {dataset} benchmark: {e}", exc_info=True)
 
-@cli_benchmark.command("nl2bash")
-@click.option("--model", required=True, 
-              help="Model to evaluate (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')")
-@click.option("--output-dir", default="results/benchmarks/nl2bash", 
-              help="Directory to save benchmark results.")
-def cli_benchmark_nl2bash(model: str, output_dir: str):
-    """Run NL2Bash benchmark evaluation on the specified model."""
-    logger.info(f"CLI benchmark nl2bash initiated for model: {model}")
+@cli.command("plot")
+@click.option("--results-dir", "-r", required=True,
+              type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True),
+              help="Directory containing benchmark results.")
+@click.option("--output-dir", "-o", required=True,
+              type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
+              help="Directory to save generated plots.")
+@click.option("--dataset", 
+              help="Optional dataset filter (e.g., 'cybench', 'nl2bash'). If not specified, plots all datasets.")
+@click.option("--success-rate", default=0.5, type=float,
+              help="Success rate threshold for horizon calculation (0.0-1.0). Default: 0.5 (50%)")
+def cli_plot(results_dir: str, output_dir: str, dataset: Optional[str], success_rate: float):
+    """Generate METR-style horizon plots from benchmark results."""
+    logger.info(f"CLI plot initiated for results_dir: {results_dir}")
+    
+    # Validate success rate
+    if not 0.0 <= success_rate <= 1.0:
+        click.echo("Error: Success rate must be between 0.0 and 1.0", err=True)
+        return
     
     try:
-        from .datasets.nl2bash.bench import NL2BashBench
+        from .analysis.plotter import create_horizon_plots_from_benchmarks
         
+        results_path = Path(results_dir)
         output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
         
-        # Initialize benchmark runner
-        bench = NL2BashBench(output_dir=output_path)
+        # Convert success rate to percentage for METR functions
+        success_rate_pct = int(success_rate * 100)
         
-        # Run evaluation
-        result = bench.run_evaluation(model_name=model)
+        # Define required data paths
+        project_root = Path(__file__).parent.parent.parent
+        human_baselines_file = project_root / "data" / "cybench_human_runs.jsonl"
+        models_registry_file = Path(__file__).parent / "models.json"
         
-        if result.success:
-            stats = result.summary_stats
-            click.echo(f"✅ NL2Bash evaluation completed successfully!")
-            click.echo(f"Tasks completed: {stats['total_tasks']}")
-            click.echo(f"Successful tasks: {stats['successful_tasks']}")
-            click.echo(f"Success rate: {stats['success_rate']:.1%}")
-            click.echo(f"Average LLM score: {stats['average_llm_score']:.3f}")
+        # Check if required files exist
+        if not human_baselines_file.exists():
+            click.echo(f"Error: Human baselines file not found: {human_baselines_file}", err=True)
+            click.echo("Run 'make cybench-parse' to generate human baseline data.", err=True)
+            return
             
-            # Show complexity breakdown
-            if stats.get('complexity_breakdown'):
-                click.echo("\nComplexity breakdown:")
-                for category, breakdown in stats['complexity_breakdown'].items():
-                    click.echo(f"  {category}: {breakdown['successful']}/{breakdown['total']} "
-                             f"({breakdown['success_rate']:.1%})")
-            
-            click.echo(f"Results saved to: {output_path}")
+        if not models_registry_file.exists():
+            click.echo(f"Error: Models registry not found: {models_registry_file}", err=True)
+            return
+        
+        # Filter results directory by dataset if specified
+        if dataset:
+            dataset_results_dir = results_path / dataset
+            if not dataset_results_dir.exists():
+                click.echo(f"Error: No results found for dataset '{dataset}' in {results_path}", err=True)
+                return
+            results_path = dataset_results_dir
+            click.echo(f"Filtering to dataset: {dataset}")
         else:
-            click.echo(f"❌ NL2Bash evaluation failed: {result.error_message}", err=True)
-            
+            click.echo("Processing all available datasets")
+        
+        click.echo(f"Generating METR-style horizon plots at {success_rate_pct}% success rate...")
+        click.echo("Using METR's logistic regression methodology...")
+        
+        # Generate plots using METR's methodology
+        plot_files = create_horizon_plots_from_benchmarks(
+            benchmark_results_dir=results_path,
+            human_baselines_file=human_baselines_file,
+            models_registry_file=models_registry_file,
+            output_dir=output_path,
+            success_rates=[success_rate_pct]
+        )
+        
+        click.echo(f"✅ Horizon plots generated successfully!")
+        click.echo(f"📊 Generated {len(plot_files)} plots using METR's exact methodology")
+        click.echo(f"📁 Plots saved to: {output_path}")
+        
+        for plot_file in plot_files:
+            click.echo(f"   • {plot_file.name}")
+        
     except ImportError as e:
-        click.echo(f"Error: NL2Bash or inspect_ai module not available: {e}", err=True)
-    except FileNotFoundError as e:
-        click.echo(f"Error: {e}", err=True)
+        click.echo(f"Error: Could not import METR analysis functions: {e}", err=True)
+        click.echo("Ensure third-party/eval-analysis-public is available.", err=True)
     except Exception as e:
-        logger.error(f"Unexpected error during nl2bash benchmark: {e}", exc_info=True)
-        click.echo(f"Unexpected error: {e}", err=True)
+        click.echo(f"An unexpected error occurred: {e}", err=True)
+        logger.error(f"Unexpected error during plotting: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    # This makes the CLI runnable when you execute the script directly
-    # e.g. python src/human_ttc_eval/cli.py parse ...
-    # However, the standard way for packages is `python -m human_ttc_eval.cli parse ...`
     cli() 

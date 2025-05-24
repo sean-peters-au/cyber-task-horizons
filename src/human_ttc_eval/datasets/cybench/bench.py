@@ -5,17 +5,19 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 import logging
 from datetime import datetime
-import re
 
 from ...core.base_bench import BaseBench, BenchmarkResult
+from ...config import (
+    CYBENCH_MAX_ITERATIONS, 
+    CYBENCH_MAX_INPUT_TOKENS, 
+    CYBENCH_MAX_OUTPUT_TOKENS,
+    CYBENCH_EVALUATION_TIMEOUT_SECONDS,
+    CYBENCH_REPO_PATH
+)
 
 logger = logging.getLogger(__name__)
 
-# CyBench Evaluation Constants
-DEFAULT_MAX_ITERATIONS = 15
-DEFAULT_MAX_INPUT_TOKENS = 6000
-DEFAULT_MAX_OUTPUT_TOKENS = 2000
-EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours
+DEFAULT_UNGUIDED_MODE = False  # Most runs use guided mode with subtasks
 
 class CyBenchBench(BaseBench):
     """
@@ -61,24 +63,25 @@ class CyBenchBench(BaseBench):
         "google/gemini-2.0-flash"
     ]
     
-    def __init__(self, output_dir: Path, cybench_repo_path: Path):
+    def __init__(self, output_dir: Path):
         """
         Initialize CyBench benchmark runner.
         
         Args:
             output_dir: Directory to store our standardized evaluation results
-            cybench_repo_path: Path to the local CyBench repository clone
+            cybench_repo_path: Path to the local CyBench repository clone (optional, defaults to config)
         """
         super().__init__("cybench", output_dir)
-        self.cybench_repo_path = Path(cybench_repo_path)
+        
+        self.cybench_repo_path = Path(CYBENCH_REPO_PATH)
         
         # Validate CyBench repo exists
         if not self.cybench_repo_path.exists():
-            raise FileNotFoundError(f"CyBench repository not found at: {cybench_repo_path}")
+            raise FileNotFoundError(f"CyBench repository not found at: {self.cybench_repo_path}")
         
         run_benchmark_script = self.cybench_repo_path / "run_benchmark.py"
         if not run_benchmark_script.exists():
-            raise FileNotFoundError(f"run_benchmark.py not found in: {cybench_repo_path}")
+            raise FileNotFoundError(f"run_benchmark.py not found in: {self.cybench_repo_path}")
             
         logger.info(f"CyBenchBench initialized with repo: {self.cybench_repo_path}")
     
@@ -114,8 +117,6 @@ class CyBenchBench(BaseBench):
         self,
         model_name: str,
         tasks: Optional[List[str]] = None,
-        max_iterations: int = DEFAULT_MAX_ITERATIONS,
-        unguided_mode: bool = False,
         **kwargs
     ) -> BenchmarkResult:
         """
@@ -124,9 +125,7 @@ class CyBenchBench(BaseBench):
         Args:
             model_name: Model identifier (must be in AVAILABLE_MODELS)
             tasks: Optional list of specific tasks (None = all tasks)
-            max_iterations: Maximum iterations per task
-            unguided_mode: Whether to run in unguided mode
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters (ignored - configuration comes from config.py)
             
         Returns:
             BenchmarkResult with parsed evaluation results
@@ -153,12 +152,12 @@ class CyBenchBench(BaseBench):
         cmd = [
             "python3", "run_benchmark.py",
             "--model", model_name,
-            "--max_iterations", str(max_iterations),
-            "--max_input_tokens", str(DEFAULT_MAX_INPUT_TOKENS),
-            "--max_output_tokens", str(DEFAULT_MAX_OUTPUT_TOKENS)
+            "--max_iterations", str(CYBENCH_MAX_ITERATIONS),
+            "--max_input_tokens", str(CYBENCH_MAX_INPUT_TOKENS),
+            "--max_output_tokens", str(CYBENCH_MAX_OUTPUT_TOKENS)
         ]
         
-        if unguided_mode:
+        if DEFAULT_UNGUIDED_MODE:
             cmd.append("--unguided_mode")
         
         # If specific tasks requested, create a custom task list file
@@ -179,7 +178,7 @@ class CyBenchBench(BaseBench):
                 cwd=self.cybench_repo_path,
                 capture_output=True,
                 text=True,
-                timeout=EVALUATION_TIMEOUT_SECONDS
+                timeout=CYBENCH_EVALUATION_TIMEOUT_SECONDS
             )
             
             end_time = datetime.now()
@@ -198,8 +197,8 @@ class CyBenchBench(BaseBench):
                 metadata={
                     "cybench_command": " ".join(cmd),
                     "duration_seconds": duration,
-                    "max_iterations": max_iterations,
-                    "unguided_mode": unguided_mode,
+                    "max_iterations": CYBENCH_MAX_ITERATIONS,
+                    "unguided_mode": DEFAULT_UNGUIDED_MODE,
                     "cybench_stdout": result.stdout[-2000:],  # Last 2000 chars
                     "cybench_stderr": result.stderr[-2000:] if result.stderr else None,
                     "cybench_returncode": result.returncode
@@ -216,14 +215,14 @@ class CyBenchBench(BaseBench):
             return benchmark_result
             
         except subprocess.TimeoutExpired:
-            error_msg = f"CyBench evaluation timed out after {EVALUATION_TIMEOUT_SECONDS} seconds"
+            error_msg = f"CyBench evaluation timed out after {CYBENCH_EVALUATION_TIMEOUT_SECONDS} seconds"
             logger.error(error_msg)
             return BenchmarkResult(
                 dataset_name=self.dataset_name,
                 model_name=model_name,
                 task_results=[],
                 summary_stats={},
-                metadata={"error": error_msg, "duration_seconds": EVALUATION_TIMEOUT_SECONDS},
+                metadata={"error": error_msg, "duration_seconds": CYBENCH_EVALUATION_TIMEOUT_SECONDS},
                 raw_output_path=None,
                 timestamp=start_time.isoformat(),
                 success=False,
