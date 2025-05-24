@@ -35,6 +35,27 @@ Each challenge includes:
 - Optional subtasks for guided evaluation
 - First-solve time metadata from original competitions
 
+**⚠️ Critical Timing Data Issues**
+
+The current timing data has significant limitations for horizon analysis:
+
+**Contamination Problem:** 
+"Fastest solve time" may represent time from competition start to first solve, not isolated task completion time. A team solving a problem at 130 minutes may have spent 120 minutes on other problems and only 10 minutes on this specific task.
+
+**Competition Context:**
+- Teams typically solve easier problems first (strategic ordering)
+- Multiple team members may work on different problems simultaneously  
+- Submission times reflect competition strategy, not focused expert time
+- Are we sure these are team based competitions?
+
+**Potential Solutions (Future Work):**
+1. **Scoreboard Analysis:** Parse competition scoreboards to approximate individual task time as ``problem_solve_time - last_submission_time_other_problem``
+2. **Percentile Filtering:** Use 90th percentile of solve times to reduce noise from lucky/strategic solves
+3. **Team Dynamics:** Account for parallel work in team-based competitions
+4. **Expert Validation:** Cross-reference with expert estimates for task complexity
+
+**Current Status:** Using fastest solve times as directional proxy. Results should be interpreted as lower bounds on expert task completion time, not precise human baselines.
+
 Competition Sources
 -------------------
 

@@ -14,8 +14,6 @@ try:
     from .datasets.nl2bash import parser as nl2bash_parser_module # noqa
     from .datasets.nl2bash import summariser as nl2bash_summariser_module # noqa
 except ImportError as e:
-    # This fallback is for making the CLI runnable for basic commands like --help
-    # even if dataset-specific dependencies are missing, though parse/summarise will fail.
     print(f"Warning: Could not import all dataset modules: {e}. Some commands might fail.", file=sys.stderr)
 
 from .core.registry import get_parser, list_parsers, get_summariser, list_summarisers, get_retriever, list_retrievers

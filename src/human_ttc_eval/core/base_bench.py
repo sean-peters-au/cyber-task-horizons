@@ -20,6 +20,9 @@ class BenchmarkResult:
     timestamp: str
     success: bool
     error_message: Optional[str] = None
+    framework: str = "unknown"
+    native_results: Optional[Any] = None
+    native_log_path: Optional[Path] = None
 
 class BaseBench(ABC):
     """
@@ -109,7 +112,10 @@ class BaseBench(ABC):
             "raw_output_path": str(result.raw_output_path) if result.raw_output_path else None,
             "timestamp": result.timestamp,
             "success": result.success,
-            "error_message": result.error_message
+            "error_message": result.error_message,
+            "framework": result.framework,
+            "native_results": result.native_results,
+            "native_log_path": str(result.native_log_path) if result.native_log_path else None
         }
         
         with open(result_path, 'w', encoding='utf-8') as f:
@@ -140,5 +146,8 @@ class BaseBench(ABC):
             raw_output_path=Path(result_dict["raw_output_path"]) if result_dict["raw_output_path"] else None,
             timestamp=result_dict["timestamp"],
             success=result_dict["success"],
-            error_message=result_dict.get("error_message")
+            error_message=result_dict.get("error_message"),
+            framework=result_dict["framework"],
+            native_results=result_dict["native_results"],
+            native_log_path=Path(result_dict["native_log_path"]) if result_dict["native_log_path"] else None
         ) 

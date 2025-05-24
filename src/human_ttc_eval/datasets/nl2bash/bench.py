@@ -9,15 +9,15 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
-from datetime import datetime
 
-from ...core.base_bench import BaseBench, BenchmarkResult
+from ...core.inspect_bench import InspectBench
+from ...core.base_bench import BenchmarkResult
 from ...core.registry import register_bench
 
 logger = logging.getLogger(__name__)
 
 @register_bench("nl2bash")
-class NL2BashBench(BaseBench):
+class NL2BashBench(InspectBench):
     """
     Benchmark runner for NL2Bash dataset using inspect_ai.
     
@@ -58,80 +58,6 @@ class NL2BashBench(BaseBench):
         """List all available NL2Bash task IDs."""
         return [task["task_id"] for task in self.tasks]
     
-    def validate_model_name(self, model_name: str) -> bool:
-        """Validate model name for inspect_ai compatibility."""
-        return "/" in model_name
-    
-    def run_evaluation(self, model_name: str, **kwargs) -> BenchmarkResult:
-        """
-        Run NL2Bash evaluation using inspect_ai.
-        
-        Args:
-            model_name: Model identifier (provider/model format)
-            **kwargs: Additional parameters (ignored for simplicity)
-            
-        Returns:
-            BenchmarkResult with evaluation results
-        """
-        start_time = datetime.now()
-        
-        if not self.validate_model_name(model_name):
-            error_msg = f"Model '{model_name}' not supported or incorrectly formatted"
-            return self._create_error_result(model_name, start_time, error_msg)
-        
-        try:
-            # Import inspect_ai
-            import inspect_ai as ai
-            from inspect_ai import Task, task, eval
-            from inspect_ai.dataset import Sample
-            from inspect_ai.solver import generate, system_message
-            
-            # Create inspect_ai task
-            inspect_task = self._create_inspect_task()
-            
-            # Run evaluation
-            logger.info(f"Starting inspect_ai evaluation for model: {model_name}")
-            eval_result = eval(
-                inspect_task,
-                model=model_name,
-                log_dir=str(self.output_dir / "inspect_logs")
-            )
-            
-            end_time = datetime.now()
-            duration = (end_time - start_time).total_seconds()
-            
-            # Parse results
-            task_results, summary_stats = self._parse_inspect_results(eval_result)
-            
-            # Create result
-            benchmark_result = BenchmarkResult(
-                dataset_name=self.dataset_name,
-                model_name=model_name,
-                task_results=task_results,
-                summary_stats=summary_stats,
-                metadata={
-                    "duration_seconds": duration,
-                    "sample_size": len(self.tasks),
-                    "inspect_ai_version": ai.__version__
-                },
-                raw_output_path=self.output_dir / "inspect_logs",
-                timestamp=start_time.isoformat(),
-                success=True,
-                error_message=None
-            )
-            
-            # Save result
-            self.save_result(benchmark_result)
-            return benchmark_result
-            
-        except ImportError as e:
-            error_msg = f"inspect_ai not available: {e}"
-            return self._create_error_result(model_name, start_time, error_msg)
-        except Exception as e:
-            error_msg = f"Evaluation failed: {e}"
-            logger.error(error_msg, exc_info=True)
-            return self._create_error_result(model_name, start_time, error_msg)
-    
     def _create_inspect_task(self):
         """Create inspect_ai Task for NL2Bash evaluation."""
         from inspect_ai import Task, task
@@ -148,7 +74,8 @@ class NL2BashBench(BaseBench):
                 metadata={
                     "complexity_category": task_data.get("_raw_complexity_category"),
                     "complexity_score": task_data.get("complexity_score"),
-                    "human_minutes": task_data.get("human_minutes")
+                    "human_minutes": task_data.get("human_minutes"),
+                    "task_family": task_data["task_family"]
                 }
             )
             samples.append(sample)
@@ -195,7 +122,7 @@ class NL2BashBench(BaseBench):
                     
                     config = LLMConfig(
                         provider="openai",
-                        model="o4-mini-2025-04-16",
+                        model="o4-mini-2025-04-16"
                     )
                     
                     client = LLMClient(config)
@@ -243,105 +170,129 @@ class NL2BashBench(BaseBench):
         return llm_bash_scorer()
     
     def _parse_inspect_results(self, eval_result) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """Parse inspect_ai evaluation results into our standardized format."""
-        # The eval_result is an EvalLogs object, need to read the actual log
-        from inspect_ai.log import read_eval_log
+        """Parse inspect_ai evaluation results with NL2Bash-specific logic."""
+        # Use the base parsing first
+        task_results, summary_stats = super()._parse_inspect_results(eval_result)
         
-        # eval_result contains the log paths/info, need to read the actual log
-        if hasattr(eval_result, 'logs') and eval_result.logs:
-            # Get the first (and should be only) log
-            log_path = eval_result.logs[0]
-            eval_log = read_eval_log(log_path)
-            samples = eval_log.samples
-        else:
-            # Fallback: try to access samples directly if available
-            samples = getattr(eval_result, 'samples', [])
-        
-        task_results = []
-        
-        for i, sample_result in enumerate(samples):
-            if i >= len(self.tasks):
-                break  # Safety check
+        # Add NL2Bash-specific parsing
+        try:
+            samples = []
+            if hasattr(eval_result, '__iter__') and hasattr(eval_result, '__len__'):
+                for eval_log in eval_result:
+                    if hasattr(eval_log, 'samples') and eval_log.samples:
+                        samples.extend(eval_log.samples)
+            else:
+                # Fallback methods
+                samples = getattr(eval_result, 'samples', [])
+            
+            # Enhanced task results with NL2Bash-specific fields
+            enhanced_task_results = []
+            for i, sample_result in enumerate(samples):
+                if i >= len(self.tasks):
+                    break  # Safety check
+                    
+                task_data = self.tasks[i]
                 
-            task_data = self.tasks[i]
-            
-            # Extract LLM score
-            scores = sample_result.scores
-            llm_score = 0.0
-            if scores and 'accuracy' in scores:
-                llm_score = scores['accuracy'].value
-            
-            # Get generated output
-            generated_command = ""
-            if sample_result.output and sample_result.output.completion:
-                generated_command = sample_result.output.completion.strip()
-            
-            task_result = {
-                "task_id": task_data["task_id"],
-                "task_family": task_data["task_family"],
-                "complexity_category": task_data.get("_raw_complexity_category", "unknown"),
-                "nl_description": task_data["nl_description"],
-                "target_command": task_data["bash_command"],
-                "generated_command": generated_command,
-                "llm_score": llm_score,
-                "success": llm_score >= 0.8,  # Consider 0.8+ as success
-                "complexity_score": task_data.get("complexity_score", 0.0),
-                "human_minutes": task_data.get("human_minutes", 0.0)
-            }
-            
-            task_results.append(task_result)
-        
-        # Calculate summary statistics
-        if task_results:
-            total_tasks = len(task_results)
-            successful_tasks = sum(1 for r in task_results if r["success"])
-            
-            # Group by complexity
-            complexity_stats = {}
-            for result in task_results:
-                category = result["complexity_category"]
-                if category not in complexity_stats:
-                    complexity_stats[category] = {"total": 0, "successful": 0, "avg_score": 0.0}
+                # Extract LLM score
+                scores = sample_result.scores
+                llm_score = 0.0
+                if scores and 'llm_bash_scorer' in scores:
+                    llm_score = scores['llm_bash_scorer'].value
                 
-                complexity_stats[category]["total"] += 1
-                if result["success"]:
-                    complexity_stats[category]["successful"] += 1
-                complexity_stats[category]["avg_score"] += result["llm_score"]
+                # Get generated output
+                generated_command = ""
+                if sample_result.output and sample_result.output.completion:
+                    generated_command = sample_result.output.completion.strip()
+                
+                task_result = {
+                    "task_id": task_data["task_id"],
+                    "task_family": task_data["task_family"],
+                    "complexity_category": task_data.get("_raw_complexity_category", "unknown"),
+                    "nl_description": task_data["nl_description"],
+                    "target_command": task_data["bash_command"],
+                    "generated_command": generated_command,
+                    "llm_score": llm_score,
+                    "success": llm_score >= 0.8,  # Consider 0.8+ as success
+                    "complexity_score": task_data.get("complexity_score", 0.0),
+                    "human_minutes": task_data.get("human_minutes", 0.0)
+                }
+                
+                enhanced_task_results.append(task_result)
             
-            # Finalize complexity stats
-            for category in complexity_stats:
-                stats = complexity_stats[category]
-                stats["success_rate"] = stats["successful"] / stats["total"]
-                stats["avg_score"] = stats["avg_score"] / stats["total"]
+            # Calculate NL2Bash-specific summary statistics
+            if enhanced_task_results:
+                total_tasks = len(enhanced_task_results)
+                successful_tasks = sum(1 for r in enhanced_task_results if r["success"])
+                
+                # Group by complexity
+                complexity_stats = {}
+                for result in enhanced_task_results:
+                    category = result["complexity_category"]
+                    if category not in complexity_stats:
+                        complexity_stats[category] = {"total": 0, "successful": 0, "avg_score": 0.0}
+                    
+                    complexity_stats[category]["total"] += 1
+                    if result["success"]:
+                        complexity_stats[category]["successful"] += 1
+                    complexity_stats[category]["avg_score"] += result["llm_score"]
+                
+                # Finalize complexity stats
+                for category in complexity_stats:
+                    stats = complexity_stats[category]
+                    stats["success_rate"] = stats["successful"] / stats["total"]
+                    stats["avg_score"] = stats["avg_score"] / stats["total"]
+                
+                enhanced_summary_stats = {
+                    "total_tasks": total_tasks,
+                    "successful_tasks": successful_tasks,
+                    "success_rate": successful_tasks / total_tasks,
+                    "average_llm_score": sum(r["llm_score"] for r in enhanced_task_results) / total_tasks,
+                    "complexity_breakdown": complexity_stats
+                }
+            else:
+                enhanced_summary_stats = {
+                    "total_tasks": 0,
+                    "successful_tasks": 0,
+                    "success_rate": 0.0,
+                    "average_llm_score": 0.0,
+                    "complexity_breakdown": {}
+                }
             
-            summary_stats = {
-                "total_tasks": total_tasks,
-                "successful_tasks": successful_tasks,
-                "success_rate": successful_tasks / total_tasks,
-                "average_llm_score": sum(r["llm_score"] for r in task_results) / total_tasks,
-                "complexity_breakdown": complexity_stats
-            }
-        else:
-            summary_stats = {
-                "total_tasks": 0,
-                "successful_tasks": 0,
-                "success_rate": 0.0,
-                "average_llm_score": 0.0,
-                "complexity_breakdown": {}
-            }
-        
-        return task_results, summary_stats
+            return enhanced_task_results, enhanced_summary_stats
+            
+        except Exception as e:
+            logger.error(f"Failed to parse NL2Bash results: {e}", exc_info=True)
+            # Fall back to base parsing
+            return task_results, summary_stats
     
-    def _create_error_result(self, model_name: str, start_time: datetime, error_msg: str) -> BenchmarkResult:
-        """Create a BenchmarkResult for error cases."""
-        return BenchmarkResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            task_results=[],
-            summary_stats={},
-            metadata={"error": error_msg},
-            raw_output_path=None,
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        ) 
+    def get_complexity_breakdown(self, result: BenchmarkResult):
+        """
+        Get NL2Bash-specific complexity analysis.
+        
+        Args:
+            result: BenchmarkResult from NL2Bash evaluation
+            
+        Returns:
+            Dictionary with complexity-based analysis
+        """
+        if result.framework == "inspect_ai":
+            # Use inspect_ai analysis tools
+            try:
+                analysis = self.get_inspect_analysis(result)
+                df = analysis.get("samples_dataframe")
+                
+                if df is not None:
+                    # Group by complexity category
+                    complexity_analysis = df.groupby('metadata.complexity_category').agg({
+                        'score_accuracy': ['mean', 'count']
+                    }).round(3)
+                    
+                    return {
+                        "complexity_breakdown": complexity_analysis.to_dict(),
+                        "inspect_view_command": analysis.get("inspect_view_command")
+                    }
+            except Exception as e:
+                logger.warning(f"Could not generate complexity breakdown: {e}")
+        
+        # Fall back to summary stats if inspect analysis fails
+        return result.summary_stats.get("complexity_breakdown", {}) 
