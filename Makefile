@@ -6,6 +6,8 @@ HTE_CLI = PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
 
 # General Project Paths
 THIRD_PARTY_DIR = third-party
+DATA_DIR = data
+RESULTS_DIR = results
 
 # Repositories to clone
 THIRD_PARTY_REPOS = \
@@ -17,41 +19,50 @@ THIRD_PARTY_REPOS = \
 
 # Dataset specific variables
 DATASET_NAME_KYPO = kypo
-RAW_DATA_DIR_KYPO = data/cybersecurity_dataset_v4
-PARSED_DATA_FILE_KYPO = data/cybersecurity_human_runs.jsonl
-SUMMARIES_DIR_KYPO = results/dataset-summaries/$(DATASET_NAME_KYPO)
+RAW_DATA_DIR_KYPO = $(DATA_DIR)/raw/$(DATASET_NAME_KYPO) # Base dir for raw kypo data
+PREPARED_DATA_FILE_KYPO = $(DATA_DIR)/processed/$(DATASET_NAME_KYPO)/$(DATASET_NAME_KYPO)_prepared.jsonl
+SUMMARIES_DIR_KYPO = $(RESULTS_DIR)/dataset-summaries/$(DATASET_NAME_KYPO)
 
 # CyBench specific variables
 DATASET_NAME_CYBENCH = cybench
-CYBENCH_METADATA_DIR = data/raw/cybench
-CYBENCH_PARSED_FILE = data/cybench_human_runs.jsonl
-CYBENCH_SUMMARIES_DIR = results/dataset-summaries/$(DATASET_NAME_CYBENCH)
+RAW_DATA_DIR_CYBENCH = $(DATA_DIR)/raw/$(DATASET_NAME_CYBENCH) # retrieve run output_dir
+PREPARED_DATA_FILE_CYBENCH = $(DATA_DIR)/processed/$(DATASET_NAME_CYBENCH)/$(DATASET_NAME_CYBENCH)_prepared.jsonl
+SUMMARIES_DIR_CYBENCH = $(RESULTS_DIR)/dataset-summaries/$(DATASET_NAME_CYBENCH)
 
 # NL2Bash specific variables
 DATASET_NAME_NL2BASH = nl2bash
-NL2BASH_METADATA_DIR = data/raw/nl2bash
-NL2BASH_PARSED_FILE = data/processed/nl2bash/all_tasks.jsonl
-NL2BASH_SUMMARIES_DIR = results/dataset-summaries/$(DATASET_NAME_NL2BASH)
+RAW_DATA_DIR_NL2BASH = $(DATA_DIR)/raw/$(DATASET_NAME_NL2BASH)
+PREPARED_DATA_FILE_NL2BASH = $(DATA_DIR)/processed/$(DATASET_NAME_NL2BASH)/$(DATASET_NAME_NL2BASH)_prepared.jsonl
+SUMMARIES_DIR_NL2BASH = $(RESULTS_DIR)/dataset-summaries/$(DATASET_NAME_NL2BASH)
 
 # InterCode specific variables
-
-# NYU-CTF specific variables
-
-# METR specific variables
+DATASET_NAME_INTERCODE_CTF = intercode-ctf
+RAW_DATA_DIR_INTERCODE_CTF = $(DATA_DIR)/raw/$(DATASET_NAME_INTERCODE_CTF)
+PREPARED_DATA_FILE_INTERCODE_CTF = $(DATA_DIR)/processed/$(DATASET_NAME_INTERCODE_CTF)/$(DATASET_NAME_INTERCODE_CTF)_prepared.jsonl
+SUMMARIES_DIR_INTERCODE_CTF = $(RESULTS_DIR)/dataset-summaries/$(DATASET_NAME_INTERCODE_CTF)
 
 # Benchmark specific variables
-BENCHMARK_RESULTS_DIR = results/benchmarks
-CYBENCH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/cybench
-NL2BASH_BENCHMARK_DIR = $(BENCHMARK_RESULTS_DIR)/nl2bash
+BENCHMARK_BASE_DIR = $(RESULTS_DIR)/benchmarks # Base for all benchmark outputs
+CYBENCH_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_CYBENCH)
+NL2BASH_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_NL2BASH)
+INTERCODE_CTF_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_INTERCODE_CTF)
 MODEL ?= openai/gpt-4o-2024-05-13  # Default model for benchmarks
-NUM_RUNS ?= 2
+NUM_RUNS ?= 1 # Changed default to 1 as per user request in previous interactions for CLI
 
 # Plot specific variables
-PLOTS_DIR = results/plots
+PLOTS_OUTPUT_DIR = $(RESULTS_DIR)/plots # Default output for plots
 SUCCESS_RATE ?= 0.5  # Default success rate threshold for horizon plots
 
-# Phony targets are targets that don't produce an output file with the same name
-.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs kypo-parse kypo-summarise cybench-retrieve cybench-parse cybench-summarise cybench-benchmark cybench-benchmark-unguided cybench-setup-env nl2bash-retrieve nl2bash-parse nl2bash-summarise nl2bash-benchmark plot plot-cybench plot-nl2bash plot-all third-party
+# Test specific variables
+TEST_DIR = src/tests
+
+# Phony targets
+.PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs test \
+        kypo-prepare kypo-describe \
+        cybench-retrieve cybench-prepare cybench-describe cybench-benchmark \
+        nl2bash-retrieve nl2bash-prepare nl2bash-describe nl2bash-benchmark \
+        intercode-ctf-retrieve intercode-ctf-prepare intercode-ctf-describe intercode-ctf-benchmark \
+        plot plot-cybench plot-nl2bash plot-all third-party
 
 # --- Third-Party Repository Setup ---
 third-party:
@@ -80,229 +91,211 @@ third-party:
 all: help
 
 help:
-	@echo "Makefile for Cybersecurity Dataset Analysis Project"
+	@echo "Makefile for Human-TTC-Eval Project (Refactored CLI)"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make <target>"
+	@echo "Usage: make <target>"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  help                Display this help message"
-	@echo "  datasets            Process all supported datasets (KYPO, CyBench, NL2Bash)"
-	@echo "  benchmark           Run benchmarks on all datasets"
-	@echo "  plot                Generate horizon plots from benchmark results"
-	@echo "  docs                Generate documentation"
-	@echo "  bench               Run benchmarks (alias for benchmark)"
-	@echo "  clean               Remove all generated files"
+	@echo "Core Commands:"
+	@echo "  test                    Run unit tests"
+	@echo "  clean                   Remove all generated files (datasets, benchmarks, plots, docs)"
+	@echo "  third-party             Setup third-party repositories"
+	@echo "  docs                    Generate Sphinx documentation"
 	@echo ""
-	@echo "Dataset-specific targets:"
-	@echo "  kypo-parse          Parse raw KYPO logs into JSONL format"
-	@echo "  kypo-summarise      Generate summaries and plots from parsed KYPO data"
-	@echo "  cybench-retrieve    Extract metadata from local CyBench repository clone"
-	@echo "  cybench-parse       Parse CyBench metadata into METR all_runs.jsonl format"
-	@echo "  cybench-summarise   Generate summaries and plots from CyBench data"
-	@echo "  nl2bash-retrieve    Download NL2Bash dataset and extract metadata"
-	@echo "  nl2bash-parse       Parse NL2Bash dataset into METR all_runs.jsonl format"
-	@echo "  nl2bash-summarise   Generate summaries and statistics from NL2Bash data"
-	@echo "  nl2bash-benchmark   Run NL2Bash benchmark evaluation"
+	@echo "Dataset Workflow (example for 'cybench'):"
+	@echo "  make cybench-retrieve   Retrieve raw data for CyBench"
+	@echo "  make cybench-prepare    Prepare raw CyBench data to METR JSONL format"
+	@echo "  make cybench-describe   Generate summaries/analysis for CyBench human data"
+	@echo "  make cybench-benchmark  Run AI model benchmarks on CyBench (uses MODEL, NUM_RUNS)"
 	@echo ""
-	@echo "Benchmark targets:"
-	@echo "  cybench-setup-env         Sync API keys to CyBench directory"
-	@echo "  cybench-benchmark         Run CyBench evaluation with subtasks (default model)"
-	@echo "  cybench-benchmark-unguided Run CyBench evaluation in unguided mode"
+	@echo "Available dataset targets (replace 'cybench' with 'kypo', 'nl2bash', 'intercode-ctf'):"
+	@echo "  <dataset>-retrieve, <dataset>-prepare, <dataset>-describe, <dataset>-benchmark"
 	@echo ""
-	@echo "Plotting targets:"
-	@echo "  plot                Generate horizon plots for all datasets"
-	@echo "  plot-cybench        Generate horizon plots for CyBench only"
-	@echo "  plot-nl2bash        Generate horizon plots for NL2Bash only"
-	@echo "  plot-all            Generate horizon plots at multiple success rates"
+	@echo "General Plotting:"
+	@echo "  make plot                 Generate horizon plots for all datasets found in results/benchmarks"
+	@echo "  make plot-cybench         Generate plots specifically for CyBench results"
+	@echo "  make plot-nl2bash         Generate plots specifically for NL2Bash results"
+	@echo "  make plot-all             Generate plots at multiple success rates for all datasets"
 	@echo ""
-	@echo "Variables:"
-	@echo "  CYBENCH_REPO_PATH   Path to CyBench repository clone (default: third-party/cybench)"
-	@echo "  MODEL               Model for benchmarks (default: openai/gpt-4o-2024-05-13)"
-	@echo "  NUM_RUNS            Number of runs for statistical analysis (default: 1)"
-	@echo "  SUCCESS_RATE        Success rate threshold for horizon plots (default: 0.5)"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make kypo-parse"
-	@echo "  make cybench-retrieve"
-	@echo "  make nl2bash-retrieve"
-	@echo "  make cybench-benchmark MODEL=anthropic/claude-3-5-sonnet-20240620"
-	@echo "  make cybench-benchmark-unguided
-	@echo "  make plot SUCCESS_RATE=0.3"
-	@echo "  make plot-cybench SUCCESS_RATE=0.7"
+	@echo "Variables for Benchmarking & Plotting:"
+	@echo "  MODEL                   Model for benchmarks (default: $(MODEL))"
+	@echo "  NUM_RUNS                Number of benchmark runs (default: $(NUM_RUNS))"
+	@echo "  SUCCESS_RATE            Success rate for horizon plots (default: $(SUCCESS_RATE))"
 	@echo ""
 
-# Main target to process all datasets (KYPO, CyBench, and NL2Bash)
-datasets: kypo-summarise cybench-summarise nl2bash-summarise
+# Test target
+test:
+	@echo ">>> Running unit tests..."
+	PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m pytest $(TEST_DIR) -v
+
+# Main target to process all datasets
+datasets: kypo-describe cybench-describe nl2bash-describe intercode-ctf-describe
 
 # Main benchmark target
-benchmark: cybench-benchmark
+benchmark: cybench-benchmark nl2bash-benchmark intercode-ctf-benchmark # Add other datasets as they become ready
 
 # Alias for benchmark
 bench: benchmark
 
-kypo-parse: $(PARSED_DATA_FILE_KYPO)
+# --- KYPO Targets ---
+kypo-prepare: $(PREPARED_DATA_FILE_KYPO)
 
-$(PARSED_DATA_FILE_KYPO):
-	@echo ">>> Parsing KYPO dataset using CLI..."
-	$(HTE_CLI) parse $(DATASET_NAME_KYPO) --input-dir $(RAW_DATA_DIR_KYPO) --output-file $(PARSED_DATA_FILE_KYPO)
+$(PREPARED_DATA_FILE_KYPO):
+	@echo ">>> Preparing KYPO dataset using CLI..."
+	# Assumes raw data is already in data/raw/kypo as per previous project structure.
+	# The Prepare class will look for data/raw/kypo internally.
+	$(HTE_CLI) prepare $(DATASET_NAME_KYPO)
 
-kypo-summarise: $(PARSED_DATA_FILE_KYPO)
-	@echo ">>> Summarising KYPO dataset using CLI..."
+kypo-describe: $(PREPARED_DATA_FILE_KYPO)
+	@echo ">>> Describing KYPO dataset using CLI..."
 	@mkdir -p $(SUMMARIES_DIR_KYPO)
-	$(HTE_CLI) summarise $(DATASET_NAME_KYPO) --jsonl-file $(PARSED_DATA_FILE_KYPO) --output-dir $(SUMMARIES_DIR_KYPO)
+	$(HTE_CLI) describe $(DATASET_NAME_KYPO)
 
-cybench-retrieve: third-party
-	@echo ">>> Retrieving CyBench metadata from local repository..."
-	@mkdir -p $(CYBENCH_METADATA_DIR)
-	$(HTE_CLI) retrieve metadata $(DATASET_NAME_CYBENCH) --output-dir $(CYBENCH_METADATA_DIR)
+# --- CyBench Targets ---
+cybench-retrieve: $(RAW_DATA_DIR_CYBENCH)
 
-cybench-parse: cybench-retrieve
-	@echo ">>> Parsing CyBench metadata into METR format..."
-	$(HTE_CLI) parse $(DATASET_NAME_CYBENCH) --input-dir $(CYBENCH_METADATA_DIR) --output-file $(CYBENCH_PARSED_FILE)
+$(RAW_DATA_DIR_CYBENCH): third-party
+	@echo ">>> Retrieving CyBench raw data using CLI..."
+	# CLI command `retrieve run cybench` will create and populate data/raw/cybench
+	$(HTE_CLI) retrieve run $(DATASET_NAME_CYBENCH)
 
-cybench-summarise: cybench-parse
-	@echo ">>> Summarising CyBench dataset using CLI..."
-	@mkdir -p $(CYBENCH_SUMMARIES_DIR)
-	$(HTE_CLI) summarise $(DATASET_NAME_CYBENCH) --jsonl-file $(CYBENCH_PARSED_FILE) --output-dir $(CYBENCH_SUMMARIES_DIR)
+cybench-prepare: $(PREPARED_DATA_FILE_CYBENCH)
 
-nl2bash-retrieve: third-party
-	@echo ">>> Retrieving NL2Bash dataset and metadata..."
-	@mkdir -p $(NL2BASH_METADATA_DIR)
-	$(HTE_CLI) retrieve metadata $(DATASET_NAME_NL2BASH) --output-dir $(NL2BASH_METADATA_DIR)
+$(PREPARED_DATA_FILE_CYBENCH): cybench-retrieve
+	@echo ">>> Preparing CyBench raw data into METR format using CLI..."
+	$(HTE_CLI) prepare $(DATASET_NAME_CYBENCH)
 
-nl2bash-parse: nl2bash-retrieve
-	@echo ">>> Parsing NL2Bash dataset into METR format..."
-	@mkdir -p $(dir $(NL2BASH_PARSED_FILE))
-	$(HTE_CLI) parse $(DATASET_NAME_NL2BASH) --input-dir $(NL2BASH_METADATA_DIR) --output-file $(NL2BASH_PARSED_FILE)
+cybench-describe: $(PREPARED_DATA_FILE_CYBENCH)
+	@echo ">>> Describing CyBench dataset using CLI..."
+	@mkdir -p $(SUMMARIES_DIR_CYBENCH)
+	$(HTE_CLI) describe $(DATASET_NAME_CYBENCH)
 
-nl2bash-summarise: nl2bash-parse
-	@echo ">>> Summarising NL2Bash dataset using CLI..."
-	@mkdir -p $(NL2BASH_SUMMARIES_DIR)
-	$(HTE_CLI) summarise $(DATASET_NAME_NL2BASH) --jsonl-file $(NL2BASH_PARSED_FILE) --output-dir $(NL2BASH_SUMMARIES_DIR)
+# --- NL2Bash Targets ---
+nl2bash-retrieve: $(RAW_DATA_DIR_NL2BASH)
 
-cybench-setup-env: .env
-	@echo ">>> Syncing API keys to CyBench directory..."
+$(RAW_DATA_DIR_NL2BASH): third-party
+	@echo ">>> Retrieving NL2Bash raw data using CLI..."
+	$(HTE_CLI) retrieve run $(DATASET_NAME_NL2BASH)
+
+nl2bash-prepare: $(PREPARED_DATA_FILE_NL2BASH)
+
+$(PREPARED_DATA_FILE_NL2BASH): nl2bash-retrieve
+	@echo ">>> Preparing NL2Bash raw data into METR format using CLI..."
+	$(HTE_CLI) prepare $(DATASET_NAME_NL2BASH)
+
+nl2bash-describe: $(PREPARED_DATA_FILE_NL2BASH)
+	@echo ">>> Describing NL2Bash dataset using CLI..."
+	@mkdir -p $(SUMMARIES_DIR_NL2BASH)
+	$(HTE_CLI) describe $(DATASET_NAME_NL2BASH)
+
+# --- InterCode-CTF Targets ---
+intercode-ctf-retrieve: $(RAW_DATA_DIR_INTERCODE_CTF)
+
+$(RAW_DATA_DIR_INTERCODE_CTF): third-party
+	@echo ">>> Retrieving InterCode-CTF raw data using CLI..."
+	$(HTE_CLI) retrieve run $(DATASET_NAME_INTERCODE_CTF)
+
+intercode-ctf-prepare: $(PREPARED_DATA_FILE_INTERCODE_CTF)
+
+$(PREPARED_DATA_FILE_INTERCODE_CTF): intercode-ctf-retrieve
+	@echo ">>> Preparing InterCode-CTF raw data into METR format using CLI..."
+	$(HTE_CLI) prepare $(DATASET_NAME_INTERCODE_CTF)
+
+intercode-ctf-describe: $(PREPARED_DATA_FILE_INTERCODE_CTF)
+	@echo ">>> Describing InterCode-CTF dataset using CLI..."
+	@mkdir -p $(SUMMARIES_DIR_INTERCODE_CTF)
+	$(HTE_CLI) describe $(DATASET_NAME_INTERCODE_CTF)
+
+# --- Benchmark Targets ---
+# cybench-setup-env is still relevant if cybench_bench.py uses it.
+cybench-setup-env:
+	@echo "Ensuring .env exists for CyBench specific setup..."
 	@if [ ! -f .env ]; then \
-		echo "❌ No .env file found in project root. Please create one with your API keys."; \
-		echo "Required keys: OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"; \
-		exit 1; \
+		echo "Warning: Project root .env file not found. CyBench setup might rely on it."; \
 	fi
-	@if [ ! -d "third-party/cybench" ]; then \
-		echo "❌ CyBench repository not found at third-party/cybench"; \
-		exit 1; \
-	fi
-	@echo "# Auto-generated from project root .env by Makefile" > "third-party/cybench/.env"
-	@echo "# Only includes keys for models you have access to" >> "third-party/cybench/.env"
-	@echo "" >> "third-party/cybench/.env"
-	@grep -E "^(OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY)" .env >> "third-party/cybench/.env" || true
-	@echo "" >> "third-party/cybench/.env"
-	@echo "# Optional keys (leave empty if not needed)" >> "third-party/cybench/.env"
-	@echo "AZURE_OPENAI_API_KEY=" >> "third-party/cybench/.env"
-	@echo "AZURE_OPENAI_ENDPOINT=" >> "third-party/cybench/.env"
-	@echo "TOGETHER_API_KEY=" >> "third-party/cybench/.env"
-	@echo "HELM_API_KEY=" >> "third-party/cybench/.env"
-	@echo "✅ API keys synced to third-party/cybench/.env"
+	# The actual syncing logic, if still needed by the cybench_bench.py, should be there.
+	# This target is now more of a prerequisite check or placeholder.
 
-cybench-benchmark: cybench-setup-env
+cybench-benchmark: cybench-setup-env $(PREPARED_DATA_FILE_CYBENCH)
 	@echo ">>> Running CyBench benchmark evaluation..."
-	@echo ">>> Model: $(MODEL)"
-	@echo ">>> Number of runs: $(NUM_RUNS)"
-	@echo ">>> Mode: Subtask (guided)"
-	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark \
-		--dataset cybench \
-		--model $(MODEL) \
-		--output-dir $(CYBENCH_BENCHMARK_DIR) \
-		--num-runs $(NUM_RUNS)
+	@echo "Model: $(MODEL), Runs: $(NUM_RUNS)"
+	@mkdir -p $(CYBENCH_BENCHMARK_OUTPUT_DIR)
+	$(HTE_CLI) benchmark $(DATASET_NAME_CYBENCH) --model "$(MODEL)" --num-runs $(NUM_RUNS)
 
-cybench-benchmark-unguided: cybench-setup-env
-	@echo ">>> Running CyBench benchmark evaluation (unguided mode)..."
-	@echo ">>> Model: $(MODEL)"
-	@echo ">>> Number of runs: $(NUM_RUNS)"
-	@echo ">>> Mode: Unguided (single objective)"
-	@mkdir -p $(CYBENCH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark \
-		--dataset cybench \
-		--model $(MODEL) \
-		--output-dir $(CYBENCH_BENCHMARK_DIR) \
-		--num-runs $(NUM_RUNS)
-
-nl2bash-benchmark:
+nl2bash-benchmark: $(PREPARED_DATA_FILE_NL2BASH)
 	@echo ">>> Running NL2Bash benchmark evaluation..."
-	@echo ">>> Model: $(MODEL)"
-	@echo ">>> Number of runs: $(NUM_RUNS)"
-	@mkdir -p $(NL2BASH_BENCHMARK_DIR)
-	$(HTE_CLI) benchmark \
-		--dataset nl2bash \
-		--model $(MODEL) \
-		--output-dir $(NL2BASH_BENCHMARK_DIR) \
-		--num-runs $(NUM_RUNS)
+	@echo "Model: $(MODEL), Runs: $(NUM_RUNS)"
+	@mkdir -p $(NL2BASH_BENCHMARK_OUTPUT_DIR)
+	$(HTE_CLI) benchmark $(DATASET_NAME_NL2BASH) --model "$(MODEL)" --num-runs $(NUM_RUNS)
 
+intercode-ctf-benchmark: $(PREPARED_DATA_FILE_INTERCODE_CTF)
+	@echo ">>> Running InterCode-CTF benchmark evaluation..."
+	@echo "Model: $(MODEL), Runs: $(NUM_RUNS)"
+	@mkdir -p $(INTERCODE_CTF_BENCHMARK_OUTPUT_DIR)
+	$(HTE_CLI) benchmark $(DATASET_NAME_INTERCODE_CTF) --model "$(MODEL)" --num-runs $(NUM_RUNS)
+
+# --- Plotting Targets ---
 plot:
 	@echo ">>> Generating horizon plots for all datasets..."
-	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
-	@mkdir -p $(PLOTS_DIR)
+	@echo "Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_OUTPUT_DIR)
 	$(HTE_CLI) plot \
-		--results-dir $(BENCHMARK_RESULTS_DIR) \
-		--output-dir $(PLOTS_DIR) \
+		--results-dir $(BENCHMARK_BASE_DIR) \
+		--output-dir $(PLOTS_OUTPUT_DIR) \
 		--success-rate $(SUCCESS_RATE)
 
 plot-cybench:
 	@echo ">>> Generating horizon plots for CyBench dataset..."
-	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
-	@mkdir -p $(PLOTS_DIR)
+	@echo "Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_OUTPUT_DIR)
 	$(HTE_CLI) plot \
-		--results-dir $(BENCHMARK_RESULTS_DIR) \
-		--output-dir $(PLOTS_DIR) \
-		--dataset cybench \
+		--results-dir $(CYBENCH_BENCHMARK_OUTPUT_DIR) \
+		--output-dir $(PLOTS_OUTPUT_DIR) \
+		--dataset $(DATASET_NAME_CYBENCH) \
 		--success-rate $(SUCCESS_RATE)
 
 plot-nl2bash:
 	@echo ">>> Generating horizon plots for NL2Bash dataset..."
-	@echo ">>> Success rate threshold: $(SUCCESS_RATE)"
-	@mkdir -p $(PLOTS_DIR)
+	@echo "Success rate threshold: $(SUCCESS_RATE)"
+	@mkdir -p $(PLOTS_OUTPUT_DIR)
 	$(HTE_CLI) plot \
-		--results-dir $(BENCHMARK_RESULTS_DIR) \
-		--output-dir $(PLOTS_DIR) \
-		--dataset nl2bash \
+		--results-dir $(NL2BASH_BENCHMARK_OUTPUT_DIR) \
+		--output-dir $(PLOTS_OUTPUT_DIR) \
+		--dataset $(DATASET_NAME_NL2BASH) \
 		--success-rate $(SUCCESS_RATE)
 
 plot-all:
 	@echo ">>> Generating horizon plots at multiple success rates..."
-	@mkdir -p $(PLOTS_DIR)
+	@mkdir -p $(PLOTS_OUTPUT_DIR)
 	@for rate in 0.3 0.5 0.7 0.9; do \
 		echo ">>> Generating plots at $${rate} success rate..."; \
 		$(HTE_CLI) plot \
-			--results-dir $(BENCHMARK_RESULTS_DIR) \
-			--output-dir $(PLOTS_DIR) \
+			--results-dir $(BENCHMARK_BASE_DIR) \
+			--output-dir $(PLOTS_OUTPUT_DIR) \
 			--success-rate $$rate; \
 	done
 
-docs: datasets
+# --- Documentation Target ---
+docs: # Removed 'datasets' dependency for now, can be added if docs consume processed data.
 	@echo ">>> Building Sphinx documentation..."
 	@cd docs && sphinx-build -b html source build/html
 	@echo "Documentation built in docs/build/html/index.html"
 
+# --- Clean Targets ---
 clean_datasets:
 	@echo ">>> Cleaning generated dataset files and summaries..."
-	rm -f $(PARSED_DATA_FILE_KYPO)
-	rm -f $(CYBENCH_PARSED_FILE)
-	rm -f $(NL2BASH_PARSED_FILE)
-	rm -rf $(CYBENCH_METADATA_DIR)
-	rm -rf $(NL2BASH_METADATA_DIR)
-	rm -rf data/processed/nl2bash
-	rm -rf results/dataset-summaries
+	rm -rf $(DATA_DIR)/raw/*/
+	rm -rf $(DATA_DIR)/processed/*/
+	rm -rf $(RESULTS_DIR)/dataset-summaries/*/
 	@echo "Dataset files and summaries cleaned."
 
 clean_benchmarks:
 	@echo ">>> Cleaning benchmark results..."
-	rm -rf $(BENCHMARK_RESULTS_DIR)
+	rm -rf $(BENCHMARK_BASE_DIR)/*/
 	@echo "Benchmark results cleaned."
 
 clean_plots:
 	@echo ">>> Cleaning generated plots..."
-	rm -rf $(PLOTS_DIR)
+	rm -rf $(PLOTS_OUTPUT_DIR)/*
 	@echo "Generated plots cleaned."
 
 clean_docs:

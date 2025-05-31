@@ -56,6 +56,7 @@ THIRD_PARTY_DIR = PROJECT_ROOT / "third-party"
 # Dataset Configuration
 CYBENCH_REPO_PATH = THIRD_PARTY_DIR / "cybench"
 NL2BASH_REPO_PATH = THIRD_PARTY_DIR / "nl2bash"
+INTERCODE_REPO_PATH = THIRD_PARTY_DIR / "intercode"
 
 def has_api_key(provider: str) -> bool:
     """Check if API key is available for a provider."""

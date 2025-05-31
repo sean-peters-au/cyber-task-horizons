@@ -11,12 +11,12 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
 
-from .base_bench import BaseBench, BenchmarkResult
+from .bench import Bench, BenchResult
 
 logger = logging.getLogger(__name__)
 
 
-class InspectBench(BaseBench, ABC):
+class InspectBench(Bench, ABC):
     """
     Base class for benchmarks using inspect_ai framework.
     
@@ -24,7 +24,7 @@ class InspectBench(BaseBench, ABC):
     customization in subclasses.
     """
     
-    def run_evaluation(self, model_name: str, **kwargs) -> BenchmarkResult:
+    def run_evaluation(self, model_name: str, **kwargs) -> BenchResult:
         """
         Run inspect_ai evaluation with framework-specific result preservation.
         
@@ -33,7 +33,7 @@ class InspectBench(BaseBench, ABC):
             **kwargs: Additional parameters passed to specific implementation
             
         Returns:
-            BenchmarkResult with both unified and native inspect_ai results
+            BenchResult with both unified and native inspect_ai results
         """
         start_time = datetime.now()
         
@@ -77,23 +77,25 @@ class InspectBench(BaseBench, ABC):
             native_results = self._extract_serializable_eval_data(eval_result)
             
             # Create result with both unified and native data
-            benchmark_result = BenchmarkResult(
+            benchmark_result = BenchResult(
                 dataset_name=self.dataset_name,
                 model_name=model_name,
-                task_results=task_results,
+                model_alias=model_name,  # Can be overridden in kwargs
+                runs=[],  # TODO: Convert task_results to Run objects
                 summary_stats=summary_stats,
                 metadata={
                     "duration_seconds": duration,
                     "sample_size": len(task_results) if task_results else 0,
-                    "inspect_ai_version": ai.__version__
+                    "inspect_ai_version": ai.__version__,
+                    "task_results": task_results,  # Store raw task results in metadata
+                    "raw_output_path": str(self.output_dir / "inspect_logs"),
+                    "native_log_path": str(native_log_path) if native_log_path else None,
+                    "native_results": native_results,
+                    "framework": "inspect_ai"
                 },
-                raw_output_path=self.output_dir / "inspect_logs",
                 timestamp=start_time.isoformat(),
                 success=True,
-                error_message=None,
-                framework="inspect_ai",
-                native_results=native_results,
-                native_log_path=native_log_path
+                error_message=None
             )
             
             # Save result
@@ -180,31 +182,32 @@ class InspectBench(BaseBench, ABC):
             logger.error(f"Failed to parse inspect_ai results: {e}", exc_info=True)
             return [], {"error": f"Result parsing failed: {e}"}
     
-    def get_inspect_analysis(self, result: BenchmarkResult):
+    def get_inspect_analysis(self, result: BenchResult):
         """
         Get inspect_ai specific analysis helpers.
         
         Args:
-            result: BenchmarkResult from an inspect_ai evaluation
+            result: BenchResult from an inspect_ai evaluation
             
         Returns:
             Dictionary with inspect_ai analysis tools and data
         """
-        if result.framework != "inspect_ai":
+        if result.metadata.get("framework") != "inspect_ai":
             raise ValueError("This method only works with inspect_ai results")
         
         analysis = {
             "framework": "inspect_ai",
-            "native_results_available": result.native_results is not None,
-            "native_log_path": result.native_log_path,
+            "native_results_available": result.metadata.get("native_results") is not None,
+            "native_log_path": result.metadata.get("native_log_path"),
         }
         
-        if result.native_log_path:
-            analysis["inspect_view_command"] = f"inspect view {result.native_log_path.parent}"
+        native_log_path = result.metadata.get("native_log_path")
+        if native_log_path:
+            analysis["inspect_view_command"] = f"inspect view {Path(native_log_path).parent}"
             
             try:
                 from inspect_ai.analysis import samples_df
-                df = samples_df(result.native_log_path)
+                df = samples_df(native_log_path)
                 analysis["samples_dataframe"] = df
                 analysis["sample_count"] = len(df)
             except Exception as e:
@@ -217,21 +220,21 @@ class InspectBench(BaseBench, ABC):
         """Validate model name for inspect_ai compatibility."""
         return "/" in model_name
     
-    def _create_error_result(self, model_name: str, start_time: datetime, error_msg: str) -> BenchmarkResult:
-        """Create a BenchmarkResult for error cases."""
-        return BenchmarkResult(
+    def _create_error_result(self, model_name: str, start_time: datetime, error_msg: str) -> BenchResult:
+        """Create a BenchResult for error cases."""
+        return BenchResult(
             dataset_name=self.dataset_name,
             model_name=model_name,
-            task_results=[],
+            model_alias=model_name,
+            runs=[],
             summary_stats={},
-            metadata={"error": error_msg},
-            raw_output_path=None,
+            metadata={
+                "error": error_msg,
+                "framework": "inspect_ai"
+            },
             timestamp=start_time.isoformat(),
             success=False,
-            error_message=error_msg,
-            framework="inspect_ai",
-            native_results=None,
-            native_log_path=None
+            error_message=error_msg
         )
 
     def _extract_serializable_eval_data(self, eval_result):
