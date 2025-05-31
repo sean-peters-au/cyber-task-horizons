@@ -214,10 +214,6 @@ def get_real_time_pricing() -> dict:
                 "gpt-4": {"input_price_per_million": 30.0, "output_price_per_million": 60.0},
                 "gpt-3.5-turbo": {"input_price_per_million": 3.0, "output_price_per_million": 6.0},
                 "gpt-4-turbo": {"input_price_per_million": 10.0, "output_price_per_million": 30.0},
-                "gpt-4o-mini": {"input_price_per_million": 0.15, "output_price_per_million": 0.6},
-                "gpt-4.1": {"input_price_per_million": 2.0, "output_price_per_million": 8.0},
-                "gpt-4.1-mini": {"input_price_per_million": 0.4, "output_price_per_million": 1.6},
-                "gpt-4.1-nano": {"input_price_per_million": 0.1, "output_price_per_million": 0.4},
                 "o3": {"input_price_per_million": 1.0, "output_price_per_million": 4.0}
             }
         },

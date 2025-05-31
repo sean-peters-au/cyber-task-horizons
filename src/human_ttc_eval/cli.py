@@ -13,12 +13,10 @@ from .datasets.cybench import cybench_retrieve # noqa
 from .datasets.cybench import cybench_prepare # noqa # TODO: Rename to cybench_prepare
 from .datasets.cybench import cybench_describe # noqa # TODO: Rename to cybench_describe
 from .datasets.cybench import cybench_bench # noqa
-# from .datasets.nl2bash import retrieve as nl2bash_retrieve_module # noqa
-# from .datasets.nl2bash import parser as nl2bash_parser_module # noqa
-# from .datasets.nl2bash import summariser as nl2bash_summariser_module # noqa
-# from .datasets.nl2bash import bench as nl2bash_bench_module # noqa
-# except ImportError as e:
-#     print(f"Warning: Could not import all dataset modules: {e}. Some commands might fail.", file=sys.stderr)
+from .datasets.nl2bash import nl2bash_retrieve # noqa
+from .datasets.nl2bash import nl2bash_prepare # noqa
+from .datasets.nl2bash import nl2bash_describe # noqa
+from .datasets.nl2bash import nl2bash_bench # noqa
 
 from .core.registry import (
     get_preparer, list_preparers,

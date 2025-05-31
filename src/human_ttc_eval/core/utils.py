@@ -21,8 +21,3 @@ def slugify(text: str) -> str:
     text = re.sub(r'__+', '_', text)          # Replace multiple underscores with single
     text = text.strip('_')                  # Remove leading/trailing underscores
     return text
-
-# Other potential utility functions to be added later:
-# - Timestamp parsing helpers (if more complex than datetime.fromisoformat)
-# - Common file reading/writing utilities (though Pathlib is quite good)
-# - Shared constants if not fitting elsewhere 

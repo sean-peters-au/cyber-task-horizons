@@ -2,6 +2,34 @@
   "models": [
     {
       "provider": "openai",
+      "model_name": "gpt2",
+      "full_name": "openai/gpt2",
+      "release_date": "2019-02-14",
+      "description": "GPT-2 base model (117M parameters)"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-2-medium",
+      "full_name": "openai/gpt-2-medium",
+      "release_date": "2019-05-03",
+      "description": "GPT-2 medium model (345M parameters)"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-2-large",
+      "full_name": "openai/gpt-2-large",
+      "release_date": "2019-08-20",
+      "description": "GPT-2 large model (774M parameters)"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-2-xl",
+      "full_name": "openai/gpt-2-xl",
+      "release_date": "2019-11-05",
+      "description": "GPT-2 XL model (1.5B parameters)"
+    },
+    {
+      "provider": "openai",
       "model_name": "gpt-4-0613",
       "full_name": "openai/gpt-4-0613",
       "release_date": "2023-06-13",

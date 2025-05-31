@@ -43,10 +43,10 @@ SUMMARIES_DIR_INTERCODE_CTF = $(RESULTS_DIR)/dataset-summaries/$(DATASET_NAME_IN
 
 # Benchmark specific variables
 BENCHMARK_BASE_DIR = $(RESULTS_DIR)/benchmarks # Base for all benchmark outputs
-CYBENCH_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_CYBENCH)
-NL2BASH_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_NL2BASH)
-INTERCODE_CTF_BENCHMARK_OUTPUT_DIR = $(BENCHMARK_BASE_DIR)/$(DATASET_NAME_INTERCODE_CTF)
-MODEL ?= openai/gpt-4o-2024-05-13  # Default model for benchmarks
+CYBENCH_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_CYBENCH)"
+NL2BASH_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_NL2BASH)"
+INTERCODE_CTF_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_INTERCODE_CTF)"
+MODEL ?= openai/gpt-2
 NUM_RUNS ?= 1 # Changed default to 1 as per user request in previous interactions for CLI
 
 # Plot specific variables
@@ -62,7 +62,8 @@ TEST_DIR = src/tests
         cybench-retrieve cybench-prepare cybench-describe cybench-benchmark \
         nl2bash-retrieve nl2bash-prepare nl2bash-describe nl2bash-benchmark \
         intercode-ctf-retrieve intercode-ctf-prepare intercode-ctf-describe intercode-ctf-benchmark \
-        plot plot-cybench plot-nl2bash plot-all third-party
+        plot plot-cybench plot-nl2bash plot-all third-party \
+        start-local-model-server stop-local-model-server
 
 # --- Third-Party Repository Setup ---
 third-party:
@@ -91,36 +92,36 @@ third-party:
 all: help
 
 help:
-	@echo "Makefile for Human-TTC-Eval Project (Refactored CLI)"
+	@echo "Human TTC Eval - Dataset preparation and evaluation pipeline"
 	@echo ""
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "Core Commands:"
-	@echo "  test                    Run unit tests"
-	@echo "  clean                   Remove all generated files (datasets, benchmarks, plots, docs)"
-	@echo "  third-party             Setup third-party repositories"
-	@echo "  docs                    Generate Sphinx documentation"
+	@echo "Data pipeline commands:"
+	@echo "  make retrieve-all       - Retrieve all raw datasets"
+	@echo "  make prepare-all        - Prepare all datasets for evaluation"
+	@echo "  make describe-all       - Generate descriptions for all datasets"
 	@echo ""
-	@echo "Dataset Workflow (example for 'cybench'):"
-	@echo "  make cybench-retrieve   Retrieve raw data for CyBench"
-	@echo "  make cybench-prepare    Prepare raw CyBench data to METR JSONL format"
-	@echo "  make cybench-describe   Generate summaries/analysis for CyBench human data"
-	@echo "  make cybench-benchmark  Run AI model benchmarks on CyBench (uses MODEL, NUM_RUNS)"
+	@echo "Dataset-specific commands:"
+	@echo "  make retrieve-{dataset} - Retrieve raw data for specific dataset"
+	@echo "  make prepare-{dataset}  - Prepare specific dataset"
+	@echo "  make describe-{dataset} - Describe specific dataset"
 	@echo ""
-	@echo "Available dataset targets (replace 'cybench' with 'kypo', 'nl2bash', 'intercode-ctf'):"
-	@echo "  <dataset>-retrieve, <dataset>-prepare, <dataset>-describe, <dataset>-benchmark"
+	@echo "Available datasets: cybench, nl2bash, intercode-ctf"
 	@echo ""
-	@echo "General Plotting:"
-	@echo "  make plot                 Generate horizon plots for all datasets found in results/benchmarks"
-	@echo "  make plot-cybench         Generate plots specifically for CyBench results"
-	@echo "  make plot-nl2bash         Generate plots specifically for NL2Bash results"
-	@echo "  make plot-all             Generate plots at multiple success rates for all datasets"
+	@echo "Benchmarking commands:"
+	@echo "  make bench-{dataset}    - Run benchmark for specific dataset"
+	@echo "                           (requires MODEL env var)"
 	@echo ""
-	@echo "Variables for Benchmarking & Plotting:"
-	@echo "  MODEL                   Model for benchmarks (default: $(MODEL))"
-	@echo "  NUM_RUNS                Number of benchmark runs (default: $(NUM_RUNS))"
-	@echo "  SUCCESS_RATE            Success rate for horizon plots (default: $(SUCCESS_RATE))"
+	@echo "Local model server commands:"
+	@echo "  make setup-vllm         - Install vLLM for local model serving"
+	@echo "  make start-gpt2         - Start GPT-2 server with vLLM"
+	@echo "  make stop-vllm          - Stop vLLM server"
 	@echo ""
+	@echo "Examples:"
+	@echo "  make retrieve-cybench"
+	@echo "  make prepare-nl2bash"
+	@echo "  MODEL=openai/gpt-4 make bench-cybench"
+	@echo "  make start-gpt2  # Then: MODEL=openai/gpt2 make bench-nl2bash"
 
 # Test target
 test:
@@ -304,4 +305,23 @@ clean_docs:
 	@echo "Sphinx build directory cleaned."
 
 clean: clean_datasets clean_benchmarks clean_plots clean_docs
-	@echo "All generated files cleaned." 
+	@echo "All generated files cleaned."
+
+start-local-model-server:
+	@echo ">>> Starting $(MODEL) server with vLLM..."
+	@echo ">>> Server will be available at http://localhost:8000"
+	@echo ">>> Use MODEL=$(MODEL) when running benchmarks"
+	@echo ">>> Press Ctrl+C to stop the server"
+	@# Convert openai/gpt-2 -> gpt2, etc.
+	@HF_MODEL=$$(echo "$(MODEL)" | sed 's|openai/gpt-2|gpt2|' | sed 's|openai/gpt-2-|gpt2-|' | sed 's|openai/||'); \
+	echo ">>> Using HuggingFace model: $$HF_MODEL"; \
+	PYTHONPATH=src: $(PYTHON) -m vllm.entrypoints.openai.api_server \
+		--model $$HF_MODEL \
+		--host 0.0.0.0 \
+		--port 8000 \
+		--max-model-len 1024 \
+		--chat-template "{% for message in messages %}{% if message['role'] == 'system' %}{{ message['content'] + '\n\n' }}{% elif message['role'] == 'user' %}{{ message['content'] }}{% endif %}{% endfor %}"
+
+stop-local-model-server:
+	@echo ">>> Stopping vLLM server..."
+	@pkill -f "vllm.entrypoints.openai.api_server" || echo "No vLLM server running" 
