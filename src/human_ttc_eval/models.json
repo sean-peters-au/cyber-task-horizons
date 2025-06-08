@@ -5,243 +5,138 @@
       "model_name": "gpt2",
       "full_name": "openai/gpt2",
       "release_date": "2019-02-14",
-      "description": "GPT-2 base model (117M parameters)"
-    },
-    {
-      "provider": "openai",
-      "model_name": "gpt2-medium",
-      "full_name": "openai/gpt2-medium",
-      "release_date": "2019-05-03",
-      "description": "GPT-2 medium model (345M parameters)"
-    },
-    {
-      "provider": "openai",
-      "model_name": "gpt2-large",
-      "full_name": "openai/gpt2-large",
-      "release_date": "2019-08-20",
-      "description": "GPT-2 large model (774M parameters)"
+      "description": "GPT-2 base model (117 M parameters)"
     },
     {
       "provider": "openai",
       "model_name": "gpt2-xl",
       "full_name": "openai/gpt2-xl",
       "release_date": "2019-11-05",
-      "description": "GPT-2 XL model (1.5B parameters)"
+      "description": "GPT-2 XL model (1.5 B parameters)"
     },
     {
       "provider": "openai",
-      "model_name": "gpt-4-0613",
-      "full_name": "openai/gpt-4-0613",
-      "release_date": "2023-06-13",
-      "description": "GPT-4 with 8K context window"
+      "model_name": "davinci-002",
+      "full_name": "openai/davinci-002",
+      "release_date": "2020-07-11",
+      "description": "GPT-3 (text-davinci-002) - 175 B parameters, RLHF instruct tuning"
     },
     {
       "provider": "openai",
-      "model_name": "gpt-4-32k-0613",
-      "full_name": "openai/gpt-4-32k-0613",
-      "release_date": "2023-06-13",
-      "description": "GPT-4 with 32K context window"
+      "model_name": "gpt-3.5-turbo-instruct",
+      "full_name": "openai/gpt-3.5-turbo-instruct",
+      "release_date": "2023-11-06",
+      "description": "GPT-3.5 Turbo (Instruct) – first 3.5 series model in completions API"
     },
     {
       "provider": "openai",
-      "model_name": "gpt-4-turbo-2024-04-09",
-      "full_name": "openai/gpt-4-turbo-2024-04-09",
-      "release_date": "2024-04-09",
-      "description": "GPT-4 Turbo with improved performance"
+      "model_name": "gpt-4-0314",
+      "full_name": "openai/gpt-4-0314",
+      "release_date": "2023-03-14",
+      "description": "GPT-4 initial 8 K context release"
     },
     {
       "provider": "openai",
-      "model_name": "gpt-4o-2024-05-13",
-      "full_name": "openai/gpt-4o-2024-05-13",
-      "release_date": "2024-05-13",
-      "description": "GPT-4o multimodal model"
-    },
-    {
-      "provider": "openai",
-      "model_name": "gpt-3.5-turbo-0125",
-      "full_name": "openai/gpt-3.5-turbo-0125",
-      "release_date": "2024-01-25",
-      "description": "GPT-3.5 Turbo updated version"
-    },
-    {
-      "provider": "openai",
-      "model_name": "o1-2024-12-17",
-      "full_name": "openai/o1-2024-12-17",
-      "release_date": "2024-12-17",
-      "description": "o1 reasoning model"
+      "model_name": "gpt-4-1106-preview",
+      "full_name": "openai/gpt-4-1106-preview",
+      "release_date": "2023-11-06",
+      "description": "GPT-4 preview with vision and 128 K context"
     },
     {
       "provider": "openai",
       "model_name": "o3-mini-2025-01-31",
       "full_name": "openai/o3-mini-2025-01-31",
       "release_date": "2025-01-31",
-      "description": "o3 Mini reasoning model"
+      "description": "o3-mini – small deliberative model (successor to o1-mini)"
+    },
+    {
+      "provider": "openai",
+      "model_name": "o3-2025-04-16",
+      "full_name": "openai/o3-2025-04-16",
+      "release_date": "2025-04-16",
+      "description": "OpenAI o3 – flagship reasoning model with tool-use & vision"
     },
     {
       "provider": "openai",
       "model_name": "o4-mini-2025-04-16",
       "full_name": "openai/o4-mini-2025-04-16",
       "release_date": "2025-04-16",
-      "description": "o4 Mini reasoning model"
-    },
-    {
-      "provider": "anthropic",
-      "model_name": "claude-3-opus-20240229",
-      "full_name": "anthropic/claude-3-opus-20240229",
-      "release_date": "2024-02-29",
-      "description": "Claude 3 Opus - most capable model"
+      "description": "o4-mini – cost-efficient successor to o3-mini"
     },
     {
       "provider": "anthropic",
       "model_name": "claude-3-5-sonnet-20240620",
       "full_name": "anthropic/claude-3-5-sonnet-20240620",
       "release_date": "2024-06-20",
-      "description": "Claude 3.5 Sonnet - balanced performance"
+      "description": "Claude 3.5 Sonnet (June snapshot) – balanced speed / quality"
     },
     {
       "provider": "anthropic",
-      "model_name": "claude-3-5-haiku-20241022",
-      "full_name": "anthropic/claude-3-5-haiku-20241022",
+      "model_name": "claude-3-5-sonnet-20241022",
+      "full_name": "anthropic/claude-3-5-sonnet-20241022",
       "release_date": "2024-10-22",
-      "description": "Claude 3.5 Haiku - fastest model"
+      "description": "Claude 3.5 Sonnet (Oct snapshot) – incremental upgrade"
     },
     {
       "provider": "anthropic",
       "model_name": "claude-3-7-sonnet-20250219",
       "full_name": "anthropic/claude-3-7-sonnet-20250219",
       "release_date": "2025-02-19",
-      "description": "Claude 3.7 Sonnet - enhanced capabilities"
-    },
-    {
-      "provider": "anthropic",
-      "model_name": "claude-sonnet-4-20250514",
-      "full_name": "anthropic/claude-sonnet-4-20250514",
-      "release_date": "2025-05-14",
-      "description": "Claude 4 Sonnet - next generation"
+      "description": "Claude 3.7 Sonnet – stronger coding & reasoning"
     },
     {
       "provider": "anthropic",
       "model_name": "claude-opus-4-20250514",
       "full_name": "anthropic/claude-opus-4-20250514",
       "release_date": "2025-05-14",
-      "description": "Claude 4 Opus - most advanced model"
+      "description": "Claude 4 Opus – Anthropic’s frontier-level model"
     },
     {
       "provider": "google",
       "model_name": "gemini-1.0-pro-001",
       "full_name": "google/gemini-1.0-pro-001",
       "release_date": "2023-12-06",
-      "description": "Gemini 1.0 Pro"
+      "description": "Gemini 1.0 Pro – first public Gemini model"
     },
     {
       "provider": "google",
       "model_name": "gemini-1.5-pro-001",
       "full_name": "google/gemini-1.5-pro-001",
       "release_date": "2024-02-15",
-      "description": "Gemini 1.5 Pro with 1M token context"
+      "description": "Gemini 1.5 Pro – 1 M-token context preview"
     },
     {
       "provider": "google",
-      "model_name": "gemini-1.5-pro-preview-0409",
-      "full_name": "google/gemini-1.5-pro-preview-0409",
-      "release_date": "2024-04-09",
-      "description": "Gemini 1.5 Pro preview version"
+      "model_name": "gemini-2.0-flash-20240520",
+      "full_name": "google/gemini-2.0-flash-20240520",
+      "release_date": "2024-05-20",
+      "description": "Gemini 2.0 Flash – low-latency variant"
     },
     {
       "provider": "google",
-      "model_name": "gemini-2.0-flash",
-      "full_name": "google/gemini-2.0-flash",
-      "release_date": "1960-01-01",
-      "description": "Gemini 2.0 Flash - high-speed model"
+      "model_name": "gemini-2.5-pro-preview-20250506",
+      "full_name": "google/gemini-2.5-pro-preview-20250506",
+      "release_date": "2025-05-06",
+      "description": "Gemini 2.5 Pro (I/O preview) – enhanced coding & reasoning"
     },
     {
       "provider": "google",
-      "model_name": "gemini-2.5-flash-preview-05-20",
-      "full_name": "google/gemini-2.5-flash-preview-05-20",
-      "release_date": "1960-01-01",
-      "description": "Gemini 2.5 Flash preview"
+      "model_name": "gemini-2.5-flash-preview-20250520",
+      "full_name": "google/gemini-2.5-flash-preview-20250520",
+      "release_date": "2025-05-20",
+      "description": "Gemini 2.5 Flash preview – speed-optimised 2.5 variant"
     },
     {
       "provider": "google",
-      "model_name": "gemini-2.5-pro-preview-05-06",
-      "full_name": "google/gemini-2.5-pro-preview-05-06",
-      "release_date": "1960-01-01",
-      "description": "Gemini 2.5 Pro preview"
-    },
-    {
-      "provider": "together",
-      "model_name": "llama-3-8b",
-      "full_name": "together/llama-3-8b",
-      "release_date": "2024-04-18",
-      "description": "Llama 3 8B base model"
-    },
-    {
-      "provider": "together",
-      "model_name": "llama-3-70b",
-      "full_name": "together/llama-3-70b",
-      "release_date": "2024-04-18",
-      "description": "Llama 3 70B base model"
-    },
-    {
-      "provider": "together",
-      "model_name": "llama-3-70b-chat",
-      "full_name": "together/llama-3-70b-chat",
-      "release_date": "2024-04-18",
-      "description": "Llama 3 70B chat-tuned model"
-    },
-    {
-      "provider": "together",
-      "model_name": "llama-3.1-70b-instruct-turbo",
-      "full_name": "together/llama-3.1-70b-instruct-turbo",
-      "release_date": "2024-07-23",
-      "description": "Llama 3.1 70B instruction-tuned turbo"
-    },
-    {
-      "provider": "together",
-      "model_name": "llama-3.1-405b-instruct-turbo",
-      "full_name": "together/llama-3.1-405b-instruct-turbo",
-      "release_date": "2024-07-23",
-      "description": "Llama 3.1 405B instruction-tuned turbo"
-    },
-    {
-      "provider": "together",
-      "model_name": "mixtral-8x22b",
-      "full_name": "together/mixtral-8x22b",
-      "release_date": "2024-04-17",
-      "description": "Mixtral 8x22B mixture of experts"
-    },
-    {
-      "provider": "together",
-      "model_name": "mixtral-8x22b-instruct-v0.1",
-      "full_name": "together/mixtral-8x22b-instruct-v0.1",
-      "release_date": "2024-04-17",
-      "description": "Mixtral 8x22B instruction-tuned"
-    },
-    {
-      "provider": "together",
-      "model_name": "qwen2-72b-instruct",
-      "full_name": "together/qwen2-72b-instruct",
-      "release_date": "2024-06-07",
-      "description": "Qwen2 72B instruction-tuned"
-    },
-    {
-      "provider": "mistralai",
-      "model_name": "mistral-large-2407",
-      "full_name": "mistralai/mistral-large-2407",
-      "release_date": "2024-07-24",
-      "description": "Mistral Large 2407"
-    },
-    {
-      "provider": "01-ai",
-      "model_name": "yi-large",
-      "full_name": "01-ai/yi-large",
-      "release_date": "2024-05-13",
-      "description": "Yi Large model"
+      "model_name": "gemini-2.5-pro-20250605",
+      "full_name": "google/gemini-2.5-pro-20250605",
+      "release_date": "2025-06-05",
+      "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up"
     }
   ],
   "metadata": {
-    "created": "2025-01-23",
-    "description": "Model registry for human-ttc-eval project",
-    "notes": "Release dates marked as 1960-01-01 are placeholders for unknown dates"
+    "created": "2025-06-08",
+    "description": "Candidate models for long-horizon human-time-to-completion benchmark (cybench, nl2bash, intercode)",
+    "notes": "Older GPT-4 Turbo, GPT-4o, o1 variants, and Claude 3 Opus removed."
   }
-} 
+}

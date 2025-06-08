@@ -47,7 +47,7 @@ CYBENCH_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_CYBENCH)"
 NL2BASH_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_NL2BASH)"
 INTERCODE_CTF_BENCHMARK_OUTPUT_DIR = "$(BENCHMARK_BASE_DIR)/$(DATASET_NAME_INTERCODE_CTF)"
 MODEL ?= openai/gpt-2
-NUM_RUNS ?= 1 # Changed default to 1 as per user request in previous interactions for CLI
+NUM_RUNS ?= 1
 
 # Plot specific variables
 PLOTS_OUTPUT_DIR = $(RESULTS_DIR)/plots # Default output for plots
@@ -56,6 +56,33 @@ SUCCESS_RATE ?= 0.5  # Default success rate threshold for horizon plots
 # Test specific variables
 TEST_DIR = src/tests
 
+# --- Model tiers for benchmarking ---
+# Short, fast feedback loop
+MODELS_1 = \
+	openai/gpt2-xl \
+	openai/gpt-3.5-turbo-instruct \
+	anthropic/claude-3-5-sonnet-20240620 \
+	openai/o4-mini-2025-04-16
+
+# Medium checkpoint sweep (adds a few classic GPT-3 / GPT-4 and newer Claude/Gemini)
+MODELS_2 = \
+	$(MODELS_1) \
+	openai/davinci-002 \
+	openai/gpt-4-0314 \
+	openai/gpt-4-1106-preview \
+	anthropic/claude-3-5-sonnet-20241022 \
+	anthropic/claude-3-7-sonnet-20250219 \
+	google/gemini-2.5-flash-preview-20250520
+
+# Full, expensive sweep (adds frontier-scale & all remaining GPT-4 variants)
+MODELS_3 = \
+	$(MODELS_2) \
+	google/gemini-2.5-pro-20250605 \
+	anthropic/claude-opus-4-20250514 \
+	openai/o3-2025-04-16 \
+	openai/gpt-4-0613 \
+	openai/gpt-4-32k-0613
+
 # Phony targets
 .PHONY: all help datasets benchmark docs bench clean clean_datasets clean_benchmarks clean_docs test \
         kypo-prepare kypo-describe \
@@ -63,7 +90,10 @@ TEST_DIR = src/tests
         nl2bash-retrieve nl2bash-prepare nl2bash-describe nl2bash-benchmark \
         intercode-ctf-retrieve intercode-ctf-prepare intercode-ctf-describe intercode-ctf-benchmark \
         plot plot-cybench plot-nl2bash plot-all third-party \
-        start-local-model-server stop-local-model-server
+        start-local-model-server stop-local-model-server \
+        bench-tier1 bench-tier1-cybench bench-tier1-nl2bash bench-tier1-intercode-ctf \
+        bench-tier2 bench-tier2-cybench bench-tier2-nl2bash bench-tier2-intercode-ctf \
+        bench-tier3 bench-tier3-cybench bench-tier3-nl2bash bench-tier3-intercode-ctf
 
 # --- Third-Party Repository Setup ---
 third-party:
@@ -110,7 +140,15 @@ help:
 	@echo ""
 	@echo "Benchmarking commands:"
 	@echo "  make bench-{dataset}    - Run benchmark for specific dataset"
-	@echo "                           (requires MODEL env var)"
+	@echo "  make bench-tier1        - Run all datasets on MODELS_1 (fast)"
+	@echo "  make bench-tier2        - Run all datasets on MODELS_2 (medium)"
+	@echo "  make bench-tier3        - Run all datasets on MODELS_3 (full)"
+	@echo "                           (requires MODEL env var for single runs)"
+	@echo ""
+	@echo "Model tiers:"
+	@echo "  MODELS_1: gpt2-xl, gpt-3.5-turbo-instruct, claude-3-5-sonnet, o4-mini"
+	@echo "  MODELS_2: MODELS_1 + davinci-002, gpt-4 variants, newer claude/gemini"
+	@echo "  MODELS_3: MODELS_2 + frontier models (o3, opus-4, gemini-2.5-pro)"
 	@echo ""
 	@echo "Local model server commands:"
 	@echo "  make setup-vllm         - Install vLLM for local model serving"
@@ -324,4 +362,74 @@ start-local-model-server:
 
 stop-local-model-server:
 	@echo ">>> Stopping vLLM server..."
-	@pkill -f "vllm.entrypoints.openai.api_server" || echo "No vLLM server running" 
+	@pkill -f "vllm.entrypoints.openai.api_server" || echo "No vLLM server running"
+
+# --- Multi-model benchmark targets ---
+bench-tier1: bench-tier1-cybench bench-tier1-nl2bash bench-tier1-intercode-ctf
+
+bench-tier1-cybench:
+	@echo ">>> Running CyBench benchmark on MODELS_1..."
+	@for model in $(MODELS_1); do \
+		echo ">>> Running $$model on CyBench..."; \
+		$(MAKE) cybench-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on CyBench"; \
+	done
+
+bench-tier1-nl2bash:
+	@echo ">>> Running NL2Bash benchmark on MODELS_1..."
+	@for model in $(MODELS_1); do \
+		echo ">>> Running $$model on NL2Bash..."; \
+		$(MAKE) nl2bash-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on NL2Bash"; \
+	done
+
+bench-tier1-intercode-ctf:
+	@echo ">>> Running InterCode-CTF benchmark on MODELS_1..."
+	@for model in $(MODELS_1); do \
+		echo ">>> Running $$model on InterCode-CTF..."; \
+		$(MAKE) intercode-ctf-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on InterCode-CTF"; \
+	done
+
+bench-tier2: bench-tier2-cybench bench-tier2-nl2bash bench-tier2-intercode-ctf
+
+bench-tier2-cybench:
+	@echo ">>> Running CyBench benchmark on MODELS_2..."
+	@for model in $(MODELS_2); do \
+		echo ">>> Running $$model on CyBench..."; \
+		$(MAKE) cybench-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on CyBench"; \
+	done
+
+bench-tier2-nl2bash:
+	@echo ">>> Running NL2Bash benchmark on MODELS_2..."
+	@for model in $(MODELS_2); do \
+		echo ">>> Running $$model on NL2Bash..."; \
+		$(MAKE) nl2bash-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on NL2Bash"; \
+	done
+
+bench-tier2-intercode-ctf:
+	@echo ">>> Running InterCode-CTF benchmark on MODELS_2..."
+	@for model in $(MODELS_2); do \
+		echo ">>> Running $$model on InterCode-CTF..."; \
+		$(MAKE) intercode-ctf-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on InterCode-CTF"; \
+	done
+
+bench-tier3: bench-tier3-cybench bench-tier3-nl2bash bench-tier3-intercode-ctf
+
+bench-tier3-cybench:
+	@echo ">>> Running CyBench benchmark on MODELS_3..."
+	@for model in $(MODELS_3); do \
+		echo ">>> Running $$model on CyBench..."; \
+		$(MAKE) cybench-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on CyBench"; \
+	done
+
+bench-tier3-nl2bash:
+	@echo ">>> Running NL2Bash benchmark on MODELS_3..."
+	@for model in $(MODELS_3); do \
+		echo ">>> Running $$model on NL2Bash..."; \
+		$(MAKE) nl2bash-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on NL2Bash"; \
+	done
+
+bench-tier3-intercode-ctf:
+	@echo ">>> Running InterCode-CTF benchmark on MODELS_3..."
+	@for model in $(MODELS_3); do \
+		echo ">>> Running $$model on InterCode-CTF..."; \
+		$(MAKE) intercode-ctf-benchmark MODEL="$$model" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $$model on InterCode-CTF"; \
+	done 
