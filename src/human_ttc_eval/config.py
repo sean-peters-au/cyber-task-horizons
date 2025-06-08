@@ -48,6 +48,9 @@ CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
 CYBENCH_MAX_OUTPUT_TOKENS = 2000
 CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups
 
+# InterCode-CTF Configuration
+INTERCODE_MAX_ITERATIONS = 10
+
 # Project Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
