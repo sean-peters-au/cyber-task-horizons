@@ -134,6 +134,17 @@ class InterCodeCTFBench(Bench):
         start_time = datetime.now(timezone.utc)
         model_alias = model_alias or model_name
         
+        # Check for zero-imputation first
+        if model_name in config.INTERCODE_IMPUTE_ZERO:
+            effective_task_ids = task_ids or self.list_available_tasks()
+            return self._create_zero_imputed_result(
+                model_name=model_name,
+                model_alias=model_alias,
+                task_ids=effective_task_ids,
+                start_time=start_time,
+                reason=f"Model '{model_name}' cannot run tool-requiring InterCode-CTF tasks"
+            )
+        
         # Validate model format
         if "/" not in model_name:
             error_msg = f"Model name must be in provider/model format, got: {model_name}"

@@ -258,7 +258,7 @@ def cli_benchmark(dataset_name: str, model: str, num_runs: int, task_ids: Option
             # run_evaluation now returns a BenchResult object
             result = bench_instance.run_evaluation(
                 model_name=model,
-                model_alias=model, # Or generate a more sophisticated alias
+                model_alias=model,
                 task_ids=task_list
             )
             all_run_results.append(result)

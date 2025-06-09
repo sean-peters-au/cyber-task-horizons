@@ -47,9 +47,17 @@ CYBENCH_MAX_ITERATIONS = 5  # Maximum iterations per task (5 is the default in c
 CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
 CYBENCH_MAX_OUTPUT_TOKENS = 2000
 CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups
+CYBENCH_IMPUTE_ZERO = [
+    "openai/gpt2-xl",
+    "openai/davinci-002",
+]
 
 # InterCode-CTF Configuration
 INTERCODE_MAX_ITERATIONS = 10
+INTERCODE_IMPUTE_ZERO = [
+    "openai/gpt2-xl", 
+    "openai/davinci-002",
+]
 
 # Project Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent

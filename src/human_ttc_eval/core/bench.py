@@ -207,6 +207,86 @@ class Bench(ABC):
             completed_at=0.0,
         )
     
+    def _create_zero_imputed_result(
+        self, 
+        model_name: str, 
+        model_alias: str, 
+        task_ids: List[str], 
+        start_time: datetime,
+        reason: str
+    ) -> BenchResult:
+        """
+        Create a BenchResult with zero scores for all tasks.
+        
+        Used when a model is incompatible with benchmark requirements
+        (e.g., tool-requiring benchmarks with models that don't support function calling).
+        
+        Args:
+            model_name: Model identifier
+            model_alias: Display name for the model
+            task_ids: List of task IDs to create zero runs for
+            start_time: Evaluation start time
+            reason: Reason for zero imputation (logged and stored in metadata)
+            
+        Returns:
+            BenchResult with zero-scored runs for all tasks
+        """
+        logger.warning(f"⚠️  ZERO IMPUTATION: {reason}")
+        logger.warning(f"   Model: {model_name}")
+        logger.warning(f"   Dataset: {self.dataset_name}")
+        logger.warning(f"   Tasks affected: {len(task_ids)}")
+        
+        runs = []
+        for task_id in task_ids:
+            human_minutes = self._get_human_minutes_for_task(task_id)
+            task_family = self._get_task_family_for_task(task_id)
+            
+            unique_suffix = uuid.uuid4().hex[:8]
+            run_id_str = f"{model_name.replace('/', '_')}_{task_id.replace('/', '_')}_imputed_{unique_suffix}"
+            
+            run = Run(
+                task_id=task_id,
+                task_family=task_family,
+                run_id=run_id_str,
+                alias=model_alias,
+                model=model_name,
+                score_binarized=0,
+                score_cont=0.0,
+                human_minutes=human_minutes,
+                fatal_error_from=f"Zero-imputed: {reason}",
+                human_source="baseline",
+                task_source=self.dataset_name,
+                generation_cost=0.0,
+                started_at=0.0,
+                completed_at=0.0,
+            )
+            runs.append(run)
+        
+        # Calculate summary stats (will show 0% success rate)
+        summary_stats = self._calculate_summary_stats(runs)
+        summary_stats["zero_imputed"] = True
+        summary_stats["imputation_reason"] = reason
+        
+        end_time = datetime.now(timezone.utc)
+        duration = (end_time - start_time).total_seconds()
+        
+        return BenchResult(
+            dataset_name=self.dataset_name,
+            model_name=model_name,
+            model_alias=model_alias,
+            runs=runs,
+            summary_stats=summary_stats,
+            metadata={
+                "zero_imputed": True,
+                "imputation_reason": reason,
+                "duration_seconds": duration,
+                "num_tasks": len(task_ids),
+            },
+            timestamp=start_time.isoformat(),
+            success=True,  # Success=True because imputation worked as intended
+            error_message=None
+        )
+    
     def _calculate_summary_stats(self, runs: List[Run]) -> Dict[str, Any]:
         """Calculate summary statistics from runs."""
         if not runs:

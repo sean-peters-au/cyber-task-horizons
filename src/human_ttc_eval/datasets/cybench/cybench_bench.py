@@ -16,7 +16,8 @@ from human_ttc_eval.config import (
     CYBENCH_MAX_INPUT_TOKENS,
     CYBENCH_MAX_OUTPUT_TOKENS,
     CYBENCH_EVALUATION_TIMEOUT_SECONDS,
-    CYBENCH_REPO_PATH
+    CYBENCH_REPO_PATH,
+    CYBENCH_IMPUTE_ZERO
 )
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,17 @@ class CybenchBench(Bench):
     ) -> BenchResult:
         eval_start_time = datetime.now(timezone.utc)
         model_alias = model_alias or model_name
+
+        # Check for zero-imputation first
+        if model_name in CYBENCH_IMPUTE_ZERO:
+            effective_task_ids = task_ids or self.list_available_tasks()
+            return self._create_zero_imputed_result(
+                model_name=model_name,
+                model_alias=model_alias,
+                task_ids=effective_task_ids,
+                start_time=eval_start_time,
+                reason=f"Model '{model_name}' cannot run tool-requiring CyBench tasks"
+            )
 
         if not self.validate_model_name(model_name):
             error_msg = f"Model '{model_name}' not supported by CyBench. Available: {self.AVAILABLE_MODELS}"
