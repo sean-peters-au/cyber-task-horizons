@@ -139,7 +139,12 @@ class NL2BashBench(Bench):
                 eval_params["model_base_url"] = local_config["base_url"]
             
             # Run evaluation
-            eval_result = inspect_eval(inspect_task, **eval_params)
+            eval_result = inspect_eval(
+                inspect_task, 
+                retry_on_error=3,  # Retry failed samples up to 3 times
+                fail_on_error=0.1,  # Tolerate up to 10% sample failures
+                **eval_params
+            )
             
             # Parse results into Run objects
             runs = self._parse_inspect_results(eval_result, tasks, model_name, model_alias)

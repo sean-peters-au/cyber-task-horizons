@@ -7,7 +7,7 @@ HTE_CLI = PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
 # Core variables
 MODEL ?= openai/gpt-2
 NUM_RUNS ?= 1
-SUCCESS_RATE ?= 0.5
+SUCCESS_RATE ?= 50
 DATASET ?= cybench
 TIER ?= 1
 
@@ -163,12 +163,9 @@ bench: prepare
 # --- Plotting Targets ---
 plot:
 	@echo ">>> Generating horizon plots for all datasets..."
-	@echo "Success rate threshold: $(SUCCESS_RATE)"
+	@echo "Success rate: $(SUCCESS_RATE)%"
 	@mkdir -p results/plots
-	$(HTE_CLI) plot \
-		--results-dir results/benchmarks \
-		--output-dir results/plots \
-		--success-rate $(SUCCESS_RATE)
+	$(HTE_CLI) plot --success-rate $(SUCCESS_RATE)
 
 # --- Local Model Server Targets ---
 start-local-model-server:

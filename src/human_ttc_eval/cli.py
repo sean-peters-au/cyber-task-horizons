@@ -293,82 +293,62 @@ def cli_benchmark(dataset_name: str, model: str, num_runs: int, task_ids: Option
         logger.error(f"Unexpected error during benchmark of '{dataset_name}': {e}", exc_info=True)
 
 @cli.command("plot")
-@click.option("--results-dir", "-r", required=True,
-              type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True),
-              help="Directory containing benchmark results.")
-@click.option("--output-dir", "-o", required=True,
-              type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
-              help="Directory to save generated plots.")
 @click.option("--dataset", 
               help="Optional dataset filter (e.g., 'cybench', 'nl2bash'). If not specified, plots all datasets.")
-@click.option("--success-rate", default=0.5, type=float,
-              help="Success rate threshold for horizon calculation (0.0-1.0). Default: 0.5 (50%)")
-def cli_plot(results_dir: str, output_dir: str, dataset: Optional[str], success_rate: float):
+@click.option("--success-rate", default=50, type=int,
+              help="Success rate percentage for horizon calculation (0-100). Default: 50")
+def cli_plot(dataset: Optional[str], success_rate: int):
     """Generate METR-style horizon plots from benchmark results."""
-    logger.info(f"CLI plot initiated for results_dir: {results_dir}")
+    logger.info(f"CLI plot initiated with dataset filter: {dataset}, success rate: {success_rate}%")
     
     # Validate success rate
-    if not 0.0 <= success_rate <= 1.0:
-        click.echo("Error: Success rate must be between 0.0 and 1.0", err=True)
+    if not 0 <= success_rate <= 100:
+        click.echo("Error: Success rate must be between 0 and 100", err=True)
         return
     
     try:
-        from .analysis.plotter import create_horizon_plots_from_benchmarks
+        from .analysis.plotter import create_horizon_plots
         
-        results_path = Path(results_dir)
-        output_path = Path(output_dir)
-        
-        # Convert success rate to percentage for METR functions
-        success_rate_pct = int(success_rate * 100)
-        
-        # Define required data paths
-        project_root = Path(__file__).parent.parent.parent
-        human_baselines_file = project_root / "data" / "cybench_human_runs.jsonl"
-        models_registry_file = Path(__file__).parent / "models.json"
-        
-        # Check if required files exist
-        if not human_baselines_file.exists():
-            click.echo(f"Error: Human baselines file not found: {human_baselines_file}", err=True)
-            click.echo("Run 'make cybench-parse' to generate human baseline data.", err=True)
-            return
-            
-        if not models_registry_file.exists():
-            click.echo(f"Error: Models registry not found: {models_registry_file}", err=True)
+        # Check if we have any benchmark results
+        benchmarks_dir = config.RESULTS_DIR / "benchmarks"
+        if not benchmarks_dir.exists() or not any(benchmarks_dir.iterdir()):
+            click.echo(f"Error: No benchmark results found in {benchmarks_dir}", err=True)
+            click.echo("Run benchmarks first using 'benchmark' command.", err=True)
             return
         
-        # Filter results directory by dataset if specified
+        # Check if METR code is available
+        metr_path = config.THIRD_PARTY_DIR / "eval-analysis-public"
+        if not metr_path.exists():
+            click.echo(f"Error: METR analysis code not found at {metr_path}", err=True)
+            click.echo("Run 'make setup' to clone required repositories.", err=True)
+            return
+        
+        click.echo(f"Generating METR-style horizon plots at {success_rate}% success rate...")
         if dataset:
-            dataset_results_dir = results_path / dataset
-            if not dataset_results_dir.exists():
-                click.echo(f"Error: No results found for dataset '{dataset}' in {results_path}", err=True)
-                return
-            results_path = dataset_results_dir
             click.echo(f"Filtering to dataset: {dataset}")
         else:
             click.echo("Processing all available datasets")
         
-        click.echo(f"Generating METR-style horizon plots at {success_rate_pct}% success rate...")
-        click.echo("Using METR's logistic regression methodology...")
-        
         # Generate plots using METR's methodology
-        plot_files = create_horizon_plots_from_benchmarks(
-            benchmark_results_dir=results_path,
-            human_baselines_file=human_baselines_file,
-            models_registry_file=models_registry_file,
-            output_dir=output_path,
-            success_rates=[success_rate_pct]
+        plot_files = create_horizon_plots(
+            success_rates=[success_rate],
+            dataset_filter=dataset
         )
         
-        click.echo(f"✅ Horizon plots generated successfully!")
-        click.echo(f"📊 Generated {len(plot_files)} plots using METR's exact methodology")
-        click.echo(f"📁 Plots saved to: {output_path}")
-        
-        for plot_file in plot_files:
-            click.echo(f"   • {plot_file.name}")
+        if plot_files:
+            output_dir = config.RESULTS_DIR / "plots"
+            click.echo(f"✅ Horizon plots generated successfully!")
+            click.echo(f"📊 Generated {len(plot_files)} plots using METR's methodology")
+            click.echo(f"📁 Plots saved to: {output_dir}")
+            
+            for plot_file in plot_files:
+                click.echo(f"   • {plot_file.name}")
+        else:
+            click.echo("⚠️  No plots generated. Check if benchmark results contain successful runs.", err=True)
         
     except ImportError as e:
-        click.echo(f"Error: Could not import METR analysis functions: {e}", err=True)
-        click.echo("Ensure third-party/eval-analysis-public is available.", err=True)
+        click.echo(f"Error: Could not import required modules: {e}", err=True)
+        click.echo("Ensure all dependencies are installed.", err=True)
     except Exception as e:
         click.echo(f"An unexpected error occurred: {e}", err=True)
         logger.error(f"Unexpected error during plotting: {e}", exc_info=True)
