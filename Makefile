@@ -12,7 +12,7 @@ DATASET ?= cybench
 TIER ?= 1
 
 # Dataset list
-DATASETS = cybench nl2bash intercode-ctf
+DATASETS = cybench nl2bash intercode-ctf cybashbench
 
 # Repositories to clone
 THIRD_PARTY_REPOS = \
@@ -100,7 +100,7 @@ help:
 	@echo "  make repro TIER=2       - Run all datasets on MODELS_2 (medium)"
 	@echo "  make repro TIER=3       - Run all datasets on MODELS_3 (full)"
 	@echo ""
-	@echo "Available datasets: cybench, nl2bash, intercode-ctf"
+	@echo "Available datasets: cybench, nl2bash, intercode-ctf, cybashbench"
 	@echo ""
 	@echo "Model tiers:"
 	@echo "  TIER=1: gpt2-xl, gpt-3.5-turbo-instruct, claude-3-5-sonnet, o4-mini"

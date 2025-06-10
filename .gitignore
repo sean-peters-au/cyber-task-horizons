@@ -18,9 +18,4 @@ wheels/
 .venv
 
 # cloned repos
-hcast-public/
-eval-analysis-public/
-modular-public/
-RE-bench/
-vivaria/
 third-party/**
