@@ -14,11 +14,11 @@ Human-TTC-Eval is designed for evaluating AI models on cybersecurity tasks, draw
 *   **Configuration-Driven Tuning:** Keep the Command Line Interface (CLI) simple with minimal arguments. Most run-specific parameters (e.g., model names, iteration counts, API keys) are managed in a central `config.py` file.
 *   **Standardized Dataset Pipeline:** Each dataset follows a consistent workflow:
     1.  **Retrieve:** Fetch raw data or metadata.
-    2.  **Parse:** Convert raw data into a standardized format (typically a JSONL file like `all_runs.jsonl` or task-specific schemas). This standardized output is crucial for consistent downstream processing.
-    3.  **Summarise:** Generate dataset-specific statistics and visualizations from the parsed data.
-    4.  **Bench:** Run AI models against the parsed tasks using appropriate evaluation harnesses.
+    2.  **Prepare:** Convert raw data into a standardized format, creating `Run` objects for human baselines and `Task` objects for benchmarking.
+    3.  **Describe:** Generate dataset-specific statistics and visualizations from the prepared data.
+    4.  **Bench:** Run AI models against the prepared tasks using appropriate evaluation harnesses.
 *   **Leverage Existing Work:** Integrate robust third-party tools where appropriate. Examples include:
-    *   Using CyBench's native benchmarking harness for CyBench tasks.
+    *   Using `inspect_ai` for sandboxed evaluation of interactive tasks (CyBench, InterCode-CTF).
     *   Employing METR's logistic regression and plotting code for horizon analysis via the `analysis` module.
 *   **Modular and Extensible:** New datasets and models can be added by implementing defined interfaces and registering them with the core system, making them automatically available via the CLI.
 
@@ -37,48 +37,49 @@ Directory Structure
     │       │
     │       ├── core/               # Core abstractions and utilities
     │       │   ├── __init__.py
-    │       │   ├── base_parser.py      # Base class for dataset parsers
-    │       │   ├── base_summariser.py  # Base class for dataset summarisers
-    │       │   ├── base_retriever.py   # Base class for dataset retrievers
-    │       │   ├── base_bench.py       # Base class for benchmark harnesses
-    │       │   ├── inspect_bench.py    # Base for inspect_ai powered benchmarks
-    │       │   ├── llm_utils.py        # LLM provider integration
-    │       │   ├── registry.py         # Decorator-based registry for components
-    │       │   └── utils.py            # Common utility functions
+    │       │   ├── retrieve.py     # Base class for dataset retrievers
+    │       │   ├── prepare.py      # Base class for dataset preparers
+    │       │   ├── describe.py     # Base class for dataset describers
+    │       │   ├── bench.py        # Base class for benchmark harnesses
+    │       │   ├── run.py          # Dataclass for a single evaluation run (METR schema)
+    │       │   ├── task.py         # Dataclass for a single task definition
+    │       │   ├── llm_utils.py      # LLM provider integration
+    │       │   └── registry.py       # Decorator-based registry for components
     │       │
     │       ├── datasets/           # Dataset-specific modules
-    │       │   ├── __init__.py         # Imports submodules to register components
-    │       │   ├── kypo/               # KYPO Cyber Range Dataset
+    │       │   ├── __init__.py       # Imports submodules to register components
+    │       │   ├── cybench/          # CyBench Dataset
     │       │   │   ├── __init__.py
-    │       │   │   ├── parser.py
-    │       │   │   └── summariser.py
-    │       │   ├── cybench/            # CyBench Dataset
+    │       │   │   ├── cybench_retrieve.py
+    │       │   │   ├── cybench_prepare.py
+    │       │   │   ├── cybench_describe.py
+    │       │   │   └── cybench_bench.py
+    │       │   ├── nl2bash/          # NL2Bash Dataset
     │       │   │   ├── __init__.py
-    │       │   │   ├── retrieve.py
-    │       │   │   ├── parser.py
-    │       │   │   ├── summariser.py
-    │       │   │   └── bench.py
-    │       │   └── nl2bash/            # NL2Bash Dataset
+    │       │   │   ├── nl2bash_retrieve.py
+    │       │   │   ├── nl2bash_prepare.py
+    │       │   │   ├── nl2bash_describe.py
+    │       │   │   └── nl2bash_bench.py
+    │       │   └── intercode_ctf/    # InterCode-CTF Dataset
     │       │       ├── __init__.py
-    │       │       ├── retrieve.py
-    │       │       ├── parser.py
-    │       │       ├── summariser.py
-    │       │       └── bench.py
+    │       │       ├── intercode_ctf_retrieve.py
+    │       │       ├── intercode_ctf_prepare.py
+    │       │       ├── intercode_ctf_describe.py
+    │       │       └── intercode_ctf_bench.py
     │       │
     │       └── analysis/           # Horizon plotting and METR integration
     │           ├── __init__.py
-    │           ├── transform.py      # Converts benchmark results to METR format
-    │           └── plotter.py        # Generates horizon plots using METR's code
+    │           ├── transform.py    # Converts benchmark results to METR format
+    │           └── plotter.py      # Generates horizon plots using METR's code
     │
     ├── data/                       # Dataset storage
     │   ├── raw/                    # Original downloaded data (e.g., from retrieve step)
-    │   ├── processed/              # Cleaned, standardized tasks (e.g., from parse step)
-    │   └── cybench_human_runs.jsonl # Example human baseline data
+    │   └── processed/              # Cleaned, standardized tasks (e.g., from prepare step)
     │
     ├── third-party/                # External repositories (e.g., nl2bash, cybench, METR's eval-analysis-public)
     ├── results/                    # Evaluation outputs
     │   ├── benchmarks/             # Raw results from AI model benchmark runs
-    │   ├── dataset-summaries/      # Outputs from the summarise step
+    │   ├── dataset-summaries/      # Outputs from the describe step
     │   └── plots/                  # Generated horizon plots and other visuals
     │
     ├── docs/                       # Documentation
@@ -96,49 +97,49 @@ The `Makefile` serves as the main entry point for most operations, providing con
 .. code-block:: bash
 
     make help                   # List all available Make targets
-    make datasets               # Process all datasets (retrieve, parse, summarise)
-    make benchmark MODEL=...    # Run benchmarks for a specified model
+    make describe-all           # Process all datasets (retrieve, prepare, describe)
+    make repro TIER=1           # Run all benchmarks for a specified tier of models
     make plot                   # Generate horizon plots from benchmark results
     make docs                   # Build Sphinx documentation
 
 **Underlying Interface: `human_ttc_eval.cli`**
 
-The `Makefile` targets typically invoke the project's Command Line Interface, built with Typer (using Click).
+The `Makefile` targets typically invoke the project's Command Line Interface, built with Click.
 
 .. code-block:: bash
 
     # Example CLI invocations (usually run via Make)
-    uv run python -m human_ttc_eval.cli parse cybench --input-dir data/raw/cybench --output-file data/cybench_human_runs.jsonl
-    uv run python -m human_ttc_eval.cli benchmark --dataset cybench --model openai/gpt-4o-2024-05-13 --output-dir results/benchmarks/cybench
-    uv run python -m human_ttc_eval.cli plot --results-dir results/benchmarks --output-dir results/plots
+    uv run python -m human_ttc_eval.cli retrieve run cybench
+    uv run python -m human_ttc_eval.cli prepare cybench
+    uv run python -m human_ttc_eval.cli describe cybench
+    uv run python -m human_ttc_eval.cli benchmark cybench --model openai/gpt-4o-2024-05-13
+    uv run python -m human_ttc_eval.cli plot
 
 Dataset Module Pattern
 ----------------------
 
-Each supported dataset (e.g., `kypo`, `cybench`, `nl2bash`) typically follows a consistent module structure within `src/human_ttc_eval/datasets/`. This promotes modularity and ease of adding new datasets.
+Each supported dataset (e.g., `cybench`, `nl2bash`) follows a consistent module structure within `src/human_ttc_eval/datasets/`. This promotes modularity and ease of adding new datasets.
 
-**1. Retriever (`retrieve.py`)**
+**1. Retriever (`<dataset>_retrieve.py`)**
    - **Purpose:** Downloads, fetches, or ensures the availability of the raw dataset files or metadata.
    - **Output:** Raw data stored in `data/raw/<dataset_name>/`.
-   - **Example:** For `nl2bash`, it clones the GitHub repository. For `cybench`, it processes metadata from a local CyBench repo clone.
+   - **Example:** For `nl2bash`, it clones the GitHub repository. For `cybench`, it processes ``challenge.yaml`` files from the `inspect_evals` repository.
 
-**2. Parser (`parser.py`)**  
-   - **Purpose:** Processes the raw data obtained by the retriever and transforms it into a standardized format. This often involves creating a JSONL file (e.g., `all_tasks.jsonl` or `cybench_human_runs.jsonl`) that represents tasks or human baseline performance.
+**2. Preparer (`<dataset>_prepare.py`)**  
+   - **Purpose:** Processes the raw data obtained by the retriever and transforms it into a standardized format. It creates a list of `Run` objects representing the human baseline and a list of `Task` objects containing all metadata needed for benchmarking.
    - **Input:** Raw data from `data/raw/<dataset_name>/`.
-   - **Output:** Standardized data in `data/processed/<dataset_name>/` or directly into files like `data/cybench_human_runs.jsonl`.
-   - **Schema:** The output aims for a common schema that can be understood by downstream analysis and benchmarking tools.
+   - **Output:** Standardized data files in `data/processed/<dataset_name>/` (e.g., `cybench_human_runs.jsonl`, `cybench_tasks.jsonl`).
+   - **Schema:** The output strictly adheres to the `Run` and `Task` dataclasses defined in `src/human_ttc_eval/core/`.
 
-**3. Summariser (`summariser.py`)**
-   - **Purpose:** Reads the parsed, standardized data and generates descriptive statistics, summaries, and dataset-specific plots.
-   - **Input:** Parsed data (e.g., JSONL files).
+**3. Describer (`<dataset>_describe.py`)**
+   - **Purpose:** Reads the prepared, standardized data and generates descriptive statistics, summaries, and dataset-specific plots.
+   - **Input:** Prepared data from `data/processed/<dataset_name>/`.
    - **Output:** CSV files and plots in `results/dataset-summaries/<dataset_name>/`.
 
-**4. Bench (`bench.py`)**
-   - **Purpose:** Provides the harness for running AI models against the tasks from the parsed dataset. This module is responsible for interacting with the AI model, presenting tasks, collecting responses, and scoring.
-   - **Integration:**
-     - For datasets like CyBench, it might wrap an external evaluation script (`third-party/cybench/run_benchmark.py`).
-     - For others like NL2Bash, it might use an internal framework like `inspect_ai` (via `core.inspect_bench.py`).
-   - **Output:** Raw benchmark results (often JSON files) in `results/benchmarks/<dataset_name>/`.
+**4. Bench (`<dataset>_bench.py`)**
+   - **Purpose:** Provides the harness for running AI models against the tasks from the prepared dataset. This module is responsible for interacting with the AI model, presenting tasks, collecting responses, and scoring.
+   - **Integration:** For all interactive datasets (`cybench`, `intercode-ctf`, `nl2bash`), it uses `inspect_ai` for sandboxed evaluation.
+   - **Output:** Raw benchmark results (JSON files) in `results/benchmarks/<dataset_name>/`.
 
 These modules are made discoverable to the CLI via registration decorators in `src/human_ttc_eval/core/registry.py`.
 
@@ -149,10 +150,9 @@ The `src/human_ttc_eval/core/` directory contains shared utilities and base clas
 
 *   **`config.py`**: Centralizes user-configurable parameters (e.g., default model names, API keys loaded from `.env`, batch sizes, file paths). This keeps the CLI lean and allows for easy tuning of experiments.
 *   **`llm_utils.py`**: Provides a unified client (`LLMClient`) for interacting with multiple LLM providers (Anthropic, OpenAI, Google). Handles API key management, retry logic, and offers batch processing utilities. Includes functions for real-time pricing estimation.
-*   **`registry.py`**: Implements a decorator-based registry system. Parsers, summarisers, retrievers, and benchmark harnesses register themselves, making them discoverable by the CLI. This allows for easy extension of the system.
-*   **Base Classes (`base_parser.py`, `base_summariser.py`, `base_retriever.py`, `base_bench.py`)**: Define abstract base classes for each component in the dataset module pattern. This enforces a consistent interface and promotes code reuse.
-*   **`inspect_bench.py`**: A specialized base class for benchmarks implemented using the `inspect_ai` evaluation framework.
-*   **`utils.py`**: Contains common utility functions, like `slugify`.
+*   **`registry.py`**: Implements a decorator-based registry system. Retrievers, preparers, describers, and benchmark harnesses register themselves, making them discoverable by the CLI. This allows for easy extension of the system.
+*   **Base Classes (`retrieve.py`, `prepare.py`, `describe.py`, `bench.py`)**: Define abstract base classes for each component in the dataset module pattern. This enforces a consistent interface and promotes code reuse.
+*   **Data Models (`run.py`, `task.py`)**: Define the canonical `Run` and `Task` dataclasses that are used throughout the pipeline, ensuring data consistency.
 
 Analysis Module
 ---------------
@@ -165,11 +165,11 @@ Adding New Datasets
 --------------------
 
 1.  Create a new directory: `src/human_ttc_eval/datasets/newdataset/`.
-2.  Implement the necessary modules (e.g., `retriever.py`, `parser.py`, `summariser.py`, `bench.py`), inheriting from the base classes in `src/human_ttc_eval/core/`.
-3.  Use the appropriate registration decorator (e.g., `@register_parser("newdataset")`) in each module.
+2.  Implement the necessary modules (e.g., `newdataset_retrieve.py`, `newdataset_prepare.py`), inheriting from the base classes in `src/human_ttc_eval/core/`.
+3.  Use the appropriate registration decorator (e.g., `@register_retriever("newdataset")`) in each module.
 4.  Import your new dataset module in `src/human_ttc_eval/datasets/__init__.py` so its components are registered at startup.
-5.  Add corresponding targets to the `Makefile` for the new dataset's processing steps (retrieve, parse, summarise, benchmark).
-6.  Ensure the `parser.py` module outputs data in a schema that `analysis.transform.py` can understand or adapt `transform.py` accordingly.
+5.  Update the `DATASETS` variable in the `Makefile` to include `newdataset`. The generic targets will then apply to it.
+6.  Ensure the `prepare.py` module outputs data consistent with the `Run` and `Task` schemas.
 
 Development Workflow
 --------------------
@@ -181,26 +181,26 @@ Development Workflow
     uv venv
     source .venv/bin/activate
     # Install dependencies
-    uv pip install -r requirements.txt # Or uv sync if pyproject.toml is primary
+    uv sync
 
     # 2. Create .env file from .env.template for API keys
     cp .env.template .env
     # Edit .env with your API keys
 
     # 3. Process a dataset (example: NL2Bash)
-    make nl2bash-retrieve
-    make nl2bash-parse
-    make nl2bash-summarise
+    make retrieve DATASET=nl2bash
+    make prepare DATASET=nl2bash
+    make describe DATASET=nl2bash
 
     # 4. Check outputs
     ls data/processed/nl2bash/
     ls results/dataset-summaries/nl2bash/
 
     # 5. Run a benchmark (example: NL2Bash with a specific model)
-    make nl2bash-benchmark MODEL=openai/gpt-4o-2024-05-13
+    make bench DATASET=nl2bash MODEL=openai/gpt-4o
 
     # 6. Transform results and generate plots
-    make plot SUCCESS_RATE=0.5
+    make plot
 
     # 7. View plots
     ls results/plots/
