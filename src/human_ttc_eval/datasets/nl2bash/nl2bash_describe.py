@@ -13,6 +13,7 @@ from collections import Counter
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import textwrap
 
 from human_ttc_eval.core.describe import Describe
 from human_ttc_eval.core.registry import register_describer
@@ -43,6 +44,7 @@ class NL2BashDescribe(Describe):
         - Feature prevalence (pipes, redirects, etc.)
         - Complexity distribution details
         - Timing source analysis
+        - Review table generation
         """
         if self.df is None or self.df.empty:
             logger.warning("No data loaded for custom NL2Bash analysis")
@@ -58,6 +60,7 @@ class NL2BashDescribe(Describe):
             self._generate_feature_analysis(task_metadata)
             self._generate_complexity_analysis(task_metadata)
             self._generate_timing_source_analysis(task_metadata)
+            self._generate_review_table(task_metadata)
             self._generate_custom_plots(task_metadata)
         else:
             logger.warning("Could not load task metadata for detailed analysis")
@@ -232,6 +235,68 @@ class NL2BashDescribe(Describe):
                     json.dump(timing_comparison, f, indent=2)
                 
                 logger.info("Saved timing source comparison")
+    
+    def _generate_review_table(self, task_metadata: Dict[str, Dict[str, Any]]) -> None:
+        """Generate a PDF table of tasks for human review."""
+        review_data = []
+        for task_id, metadata in task_metadata.items():
+            run_data = self.df[self.df['task_id'] == task_id]
+            if not run_data.empty:
+                human_minutes = run_data.iloc[0].get('human_minutes', 0)
+                estimated_seconds = human_minutes * 60
+                
+                review_data.append({
+                    'NL Description': metadata.get('nl_description', ''),
+                    'Bash Command': metadata.get('bash_command', ''),
+                    'Time (s)': f"{estimated_seconds:.1f}"
+                })
+
+        if not review_data:
+            logger.warning("No data to generate review table.")
+            return
+
+        review_df = pd.DataFrame(review_data)
+        
+        # Sort by time estimate
+        review_df['Time (s)'] = pd.to_numeric(review_df['Time (s)'])
+        review_df = review_df.sort_values(by='Time (s)', ascending=True).reset_index(drop=True)
+
+        # Wrap text for better display in PDF
+        wrapped_df = review_df.copy()
+        
+        # Escape special characters for matplotlib to avoid parsing errors
+        for col in ['NL Description', 'Bash Command']:
+            wrapped_df[col] = wrapped_df[col].astype(str).str.replace('$', r'\$', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('{', r'\{', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('}', r'\}', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('_', r'\_', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('#', r'\#', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('%', r'\%', regex=False)
+            wrapped_df[col] = wrapped_df[col].str.replace('&', r'\&', regex=False)
+
+        wrapped_df['NL Description'] = wrapped_df['NL Description'].apply(lambda x: '\n'.join(textwrap.wrap(x, width=60)))
+        wrapped_df['Bash Command'] = wrapped_df['Bash Command'].apply(lambda x: '\n'.join(textwrap.wrap(x, width=50)))
+        
+        # Create PDF with matplotlib table
+        fig, ax = plt.subplots(figsize=(16, 2 + len(wrapped_df) * 0.8)) # Dynamic height
+        ax.axis('tight')
+        ax.axis('off')
+        
+        table = ax.table(cellText=wrapped_df.values, colLabels=wrapped_df.columns, loc='center', cellLoc='left')
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 2.5) # Adjust scale for vertical spacing
+        
+        # Make header bold
+        for (row, col), cell in table.get_celld().items():
+            if row == 0:
+                cell.set_text_props(weight='bold')
+
+        pdf_path = self.output_dir / 'tasks_review.pdf'
+        plt.savefig(pdf_path, bbox_inches='tight', pad_inches=0.1)
+        plt.close(fig)
+        
+        logger.info(f"Saved task review table to {pdf_path}")
     
     def _generate_custom_plots(self, task_metadata: Dict[str, Dict[str, Any]]) -> None:
         """Generate NL2Bash-specific visualizations."""

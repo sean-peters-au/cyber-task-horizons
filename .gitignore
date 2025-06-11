@@ -2,7 +2,8 @@
 
 docs/build/
 logs/   
-data/
+data/*
+!data/keep
 results/
 docs/working-docs
 

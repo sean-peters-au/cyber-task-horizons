@@ -31,7 +31,7 @@ class CyBashBenchRetrieve(Retrieve):
         super().__init__(dataset_name)
         # Assumes the tasks file is in a 'cybashbench' directory at the project root.
         # This path might need to be added to config.py if it doesn't use PROJECT_ROOT
-        self.source_data_file = config.PROJECT_ROOT / "cybashbench" / "cybashbench_tasks.jsonl"
+        self.source_data_file = config.PROJECT_ROOT / "data" / "keep" / "cybashbench" / "cybashbench_tasks.jsonl"
 
     def retrieve(self) -> List[Path]:
         """
@@ -46,7 +46,7 @@ class CyBashBenchRetrieve(Retrieve):
 
         # Verify source file exists
         if not self.source_data_file.exists():
-            raise FileNotFoundError(f"CyBashBench source file not found: {self.source_data_file}. Please ensure it is located at the project root under 'cybashbench/'.")
+            raise FileNotFoundError(f"CyBashBench source file not found: {self.source_data_file}. Please ensure it is located at 'data/keep/cybashbench/'.")
 
         # Define destination file
         dest_file = self.output_dir / self.source_data_file.name

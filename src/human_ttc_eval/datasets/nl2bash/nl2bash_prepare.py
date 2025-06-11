@@ -35,7 +35,7 @@ class NL2BashTask:
     complexity_category: str
     utilities_used: List[str]
     estimated_time_seconds: float
-    timing_source: str  # "heuristic" or "llm"
+    timing_source: str  # "human_provided" or "default"
 
 
 @register_preparer("nl2bash")
@@ -47,7 +47,28 @@ class NL2BashPrepare(Prepare):
         super().__init__(dataset_name="nl2bash")
         self.atomic_only = False  # Could be made configurable
         self.sample_size = config.NL2BASH_SAMPLE_SIZE  # From config
-        self.use_llm_timing = config.ENABLE_LLM_TIMING  # From config
+        self.human_runs_path = config.PROJECT_ROOT / "data" / "keep" / "nl2bash" / "nl2bash_human_runs.jsonl"
+        self.human_time_estimates = self._load_human_time_estimates()
+
+    def _load_human_time_estimates(self) -> Dict[int, float]:
+        """Loads human time estimates from a JSONL file."""
+        estimates = {}
+        if not self.human_runs_path.exists():
+            raise FileNotFoundError(f"Human runs file not found: {self.human_runs_path}")
+        
+        with open(self.human_runs_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    task_id = data.get("task_id")
+                    seconds = data.get("estimated_time_seconds")
+                    if task_id is not None and seconds is not None:
+                        estimates[int(task_id)] = float(seconds)
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+                    logger.warning(f"Skipping invalid line in {self.human_runs_path}: {line.strip()} - {e}")
+        
+        logger.info(f"Loaded {len(estimates)} human time estimates from {self.human_runs_path}")
+        return estimates
         
     def get_dataset_task_metadata(self, representative_run: Run) -> Dict[str, Any]:
         """
@@ -142,10 +163,6 @@ class NL2BashPrepare(Prepare):
         
         logger.info(f"Analyzed {len(tasks)} tasks")
         
-        # Apply LLM timing if enabled
-        if self.use_llm_timing and tasks:
-            self._apply_llm_timing(tasks)
-        
         # Apply sampling if requested
         if self.sample_size and len(tasks) > self.sample_size:
             original_count = len(tasks)
@@ -187,95 +204,6 @@ class NL2BashPrepare(Prepare):
         
         return tasks
     
-    def _apply_llm_timing(self, tasks: List[NL2BashTask]) -> None:
-        """Apply LLM timing estimates to tasks."""
-        
-        # Show cost estimate
-        cost_info = estimate_batch_cost_realtime(
-            len(tasks), 
-            config.NL2BASH_BATCH_SIZE, 
-            config.NL2BASH_LLM_PROVIDER, 
-            config.NL2BASH_LLM_MODEL
-        )
-        
-        logger.info(f"LLM timing cost estimate: ${cost_info['estimated_total_cost']:.2f} "
-                    f"({cost_info['num_batches']} batches)")
-        
-        # Process in batches
-        def process_batch(batch: List[NL2BashTask]) -> List[Dict[int, float]]:
-            return [self._estimate_batch_with_llm(batch)]
-        
-        def progress_callback(current: int, total: int):
-            logger.info(f"Processed LLM batch {current}/{total}")
-        
-        logger.info(f"Starting LLM timing estimation for {len(tasks)} tasks")
-        batch_results = batch_process_parallel(
-            tasks, 
-            process_batch, 
-            config.NL2BASH_BATCH_SIZE, 
-            max_workers=4, 
-            progress_callback=progress_callback
-        )
-        
-        # Apply LLM estimates
-        all_estimates = {}
-        for batch_result in batch_results:
-            all_estimates.update(batch_result)
-        
-        for task in tasks:
-            if task.id in all_estimates:
-                task.estimated_time_seconds = all_estimates[task.id]
-                task.timing_source = "llm"
-        
-        logger.info(f"Applied LLM timing to {len(all_estimates)} tasks")
-    
-    def _estimate_batch_with_llm(self, tasks: List[NL2BashTask]) -> Dict[int, float]:
-        """Estimate timing for a batch of tasks using LLM."""
-        try:
-            from human_ttc_eval.core.llm_utils import LLMClient, LLMConfig
-            
-            config_obj = LLMConfig(
-                provider=config.NL2BASH_LLM_PROVIDER,
-                model=config.NL2BASH_LLM_MODEL,
-                max_tokens=4096,
-                temperature=0.1
-            )
-            
-            client = LLMClient(config_obj)
-            system_prompt, user_prompt = self._create_timing_prompt(tasks)
-            response = client.call(user_prompt, system_prompt)
-            
-            # Parse response
-            estimates = json.loads(response)
-            result = {}
-            for estimate in estimates:
-                task_id = estimate['id']
-                seconds = max(5.0, min(600.0, float(estimate['seconds'])))  # Sanity bounds
-                result[task_id] = seconds
-            
-            return result
-            
-        except Exception as e:
-            logger.warning(f"LLM batch estimation failed: {e}")
-            return {}
-    
-    def _create_timing_prompt(self, tasks: List[NL2BashTask]) -> tuple[str, str]:
-        """Create prompts for LLM timing estimation."""
-        system_prompt = """You are an expert Linux system administrator. Estimate how long it would take an expert Linux user to complete each bash command task.
-
-Consider: reading the description, thinking about the command, typing it (including trial and error), and command familiarity.
-
-Return ONLY a JSON array: [{"id": 1, "seconds": 25}, {"id": 2, "seconds": 45}, ...]"""
-
-        user_prompt = "Estimate completion times for these bash tasks:\n\n"
-        for task in tasks:
-            user_prompt += f"ID {task.id}: {task.nl_description}\n"
-            user_prompt += f"Command: {task.bash_command}\n"
-            user_prompt += f"Complexity: {task.complexity_score}\n\n"
-        
-        user_prompt += f"\nReturn JSON array with {len(tasks)} estimates in seconds."
-        return system_prompt, user_prompt
-    
     def _analyze_command(self, task_id: int, nl_description: str, bash_command: str) -> NL2BashTask:
         """Analyze a bash command and create a task object."""
         word_count = len(bash_command.split())
@@ -287,10 +215,9 @@ Return ONLY a JSON array: [{"id": 1, "seconds": 25}, {"id": 2, "seconds": 45}, .
         complexity_category = self._get_complexity_category(complexity_score)
         utilities_used = self._extract_utilities(bash_command)
         
-        # Estimate time using heuristics
-        estimated_time_seconds = self._estimate_time_heuristic(
-            complexity_score, word_count, has_pipes, has_redirects, has_subcommands, utilities_used
-        )
+        # Get pre-calculated time from loaded estimates, with a default fallback
+        estimated_time_seconds = self.human_time_estimates.get(task_id, 30.0)
+        timing_source = "human_provided" if task_id in self.human_time_estimates else "default"
         
         return NL2BashTask(
             id=task_id,
@@ -304,7 +231,7 @@ Return ONLY a JSON array: [{"id": 1, "seconds": 25}, {"id": 2, "seconds": 45}, .
             complexity_category=complexity_category,
             utilities_used=utilities_used,
             estimated_time_seconds=estimated_time_seconds,
-            timing_source="heuristic"
+            timing_source=timing_source
         )
     
     def _extract_utilities(self, command: str) -> List[str]:
@@ -357,37 +284,6 @@ Return ONLY a JSON array: [{"id": 1, "seconds": 25}, {"id": 2, "seconds": 45}, .
             score = score / (word_count ** 0.5)
         
         return round(score, 2)
-    
-    def _estimate_time_heuristic(self, complexity_score: float, word_count: int, 
-                                 has_pipes: bool, has_redirects: bool, has_subcommands: bool,
-                                 utilities_used: List[str]) -> float:
-        """Estimate completion time using heuristics."""
-        base_time = 10.0  # 10 seconds minimum
-        
-        # Add time based on complexity score
-        complexity_time = complexity_score * 5.0
-        
-        # Add time for word count (reading/typing)
-        word_time = word_count * 1.5
-        
-        # Add time for specific features
-        if has_pipes:
-            base_time += 15.0
-        if has_redirects:
-            base_time += 10.0
-        if has_subcommands:
-            base_time += 20.0
-        
-        # Add time for complex utilities
-        complex_utils = {'awk', 'sed', 'find', 'xargs', 'grep', 'perl'}
-        for util in utilities_used:
-            if util in complex_utils:
-                base_time += 10.0
-        
-        total_time = base_time + complexity_time + word_time
-        
-        # Cap at reasonable maximum (5 minutes)
-        return min(total_time, 300.0)
     
     def _is_atomic_command(self, command: str) -> bool:
         """Check if a command is 'atomic' (simple, no pipes/redirects)."""
