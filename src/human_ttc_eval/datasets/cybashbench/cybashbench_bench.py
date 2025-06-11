@@ -6,6 +6,8 @@ command generation tasks, including contextual and multi-step scenarios.
 """
 
 import logging
+import json
+from pathlib import Path
 from typing import List, Dict, Any
 import uuid
 
@@ -20,6 +22,7 @@ from openai import OpenAI
 from human_ttc_eval.core.registry import register_bench
 from human_ttc_eval.datasets.nl2bash.nl2bash_bench import NL2BashBench
 from human_ttc_eval.core.run import Run
+from human_ttc_eval.config import PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,24 @@ class CyBashBench(NL2BashBench):
         """
         is_completion_model = any(m in model_name.lower() for m in ['gpt2', 'gpt-2', 'davinci'])
 
+        # Determine max_tokens from models.json
+        max_tokens = 4096  # Sensible default
+        models_file = PROJECT_ROOT / "src" / "human_ttc_eval" / "models.json"
+
+        with open(models_file, 'r') as f:
+            models_data = json.load(f)
+        model_found = False
+        for model in models_data.get("models", []):
+            if model.get("full_name") == model_name:
+                max_tokens = model.get("max_output_tokens", 4096)
+                model_found = True
+                break
+        if not model_found:
+                logger.warning(f"Model '{model_name}' not found in models.json, using default max_tokens={max_tokens}.")
+
+        input_tokens = 256 # guess
+        max_tokens = max_tokens - input_tokens
+
         # Separate tasks by type
         tasks_by_type: Dict[str, List[Dict[str, Any]]] = {}
         for t in tasks:
@@ -74,7 +95,7 @@ class CyBashBench(NL2BashBench):
                     dataset=all_samples,
                     solver=generate(max_tokens=50, stop_seqs=["\n", "\n\n", "Task:", "Context:", "Previous command:"]),
                     scorer=self._create_cybash_scorer(),
-                    config=GenerateConfig(max_tokens=512)
+                    config=GenerateConfig(max_tokens=max_tokens)
                 )
         else:
             @task
@@ -83,7 +104,7 @@ class CyBashBench(NL2BashBench):
                     dataset=all_samples,
                     solver=[system_message(self._get_system_message()), generate()],
                     scorer=self._create_cybash_scorer(),
-                    config=GenerateConfig(max_tokens=5000)
+                    config=GenerateConfig(max_tokens=max_tokens)
                 )
         
         return cybashbench_task()

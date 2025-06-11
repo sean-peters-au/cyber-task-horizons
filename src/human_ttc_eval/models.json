@@ -5,6 +5,7 @@
       "model_name": "gpt2",
       "full_name": "openai/gpt2",
       "release_date": "2019-02-14",
+      "max_output_tokens": 1024,
       "description": "GPT-2 base model (117 M parameters)"
     },
     {
@@ -12,6 +13,7 @@
       "model_name": "gpt2-xl",
       "full_name": "openai/gpt2-xl",
       "release_date": "2019-11-05",
+      "max_output_tokens": 1024,
       "description": "GPT-2 XL model (1.5 B parameters)"
     },
     {
@@ -19,6 +21,7 @@
       "model_name": "davinci-002",
       "full_name": "openai/davinci-002",
       "release_date": "2020-07-11",
+      "max_output_tokens": 4096,
       "description": "GPT-3 (text-davinci-002) - 175 B parameters, RLHF instruct tuning"
     },
     {
@@ -26,6 +29,7 @@
       "model_name": "gpt-3.5-turbo",
       "full_name": "openai/gpt-3.5-turbo",
       "release_date": "2022-03-15",
+      "max_output_tokens": 4096,
       "description": "GPT-3.5 Turbo - chat model, optimized for conversational use"
     },
     {
@@ -33,6 +37,7 @@
       "model_name": "gpt-4-0314",
       "full_name": "openai/gpt-4-0314",
       "release_date": "2023-03-14",
+      "max_output_tokens": 8192,
       "description": "GPT-4 initial 8 K context release"
     },
     {
@@ -40,6 +45,7 @@
       "model_name": "gpt-4-1106-preview",
       "full_name": "openai/gpt-4-1106-preview",
       "release_date": "2023-11-06",
+      "max_output_tokens": 4096,
       "description": "GPT-4 preview with vision and 128 K context"
     },
     {
@@ -47,6 +53,7 @@
       "model_name": "o3-mini-2025-01-31",
       "full_name": "openai/o3-mini-2025-01-31",
       "release_date": "2025-01-31",
+      "max_output_tokens": 4096,
       "description": "o3-mini – small deliberative model (successor to o1-mini)"
     },
     {
@@ -54,6 +61,7 @@
       "model_name": "o3-2025-04-16",
       "full_name": "openai/o3-2025-04-16",
       "release_date": "2025-04-16",
+      "max_output_tokens": 8192,
       "description": "OpenAI o3 – flagship reasoning model with tool-use & vision"
     },
     {
@@ -61,6 +69,7 @@
       "model_name": "o4-mini-2025-04-16",
       "full_name": "openai/o4-mini-2025-04-16",
       "release_date": "2025-04-16",
+      "max_output_tokens": 8192,
       "description": "o4-mini – cost-efficient successor to o3-mini"
     },
     {
@@ -68,6 +77,7 @@
       "model_name": "claude-3-5-sonnet-20240620",
       "full_name": "anthropic/claude-3-5-sonnet-20240620",
       "release_date": "2024-06-20",
+      "max_output_tokens": 8192,
       "description": "Claude 3.5 Sonnet (June snapshot) – balanced speed / quality"
     },
     {
@@ -75,6 +85,7 @@
       "model_name": "claude-3-5-sonnet-20241022",
       "full_name": "anthropic/claude-3-5-sonnet-20241022",
       "release_date": "2024-10-22",
+      "max_output_tokens": 8192,
       "description": "Claude 3.5 Sonnet (Oct snapshot) – incremental upgrade"
     },
     {
@@ -82,6 +93,7 @@
       "model_name": "claude-3-7-sonnet-20250219",
       "full_name": "anthropic/claude-3-7-sonnet-20250219",
       "release_date": "2025-02-19",
+      "max_output_tokens": 8192,
       "description": "Claude 3.7 Sonnet – stronger coding & reasoning"
     },
     {
@@ -89,6 +101,7 @@
       "model_name": "claude-opus-4-20250514",
       "full_name": "anthropic/claude-opus-4-20250514",
       "release_date": "2025-05-14",
+      "max_output_tokens": 8192,
       "description": "Claude 4 Opus – Anthropic's frontier-level model"
     },
     {
@@ -96,6 +109,7 @@
       "model_name": "gemini-1.0-pro-001",
       "full_name": "google/gemini-1.0-pro-001",
       "release_date": "2023-12-06",
+      "max_output_tokens": 2048,
       "description": "Gemini 1.0 Pro – first public Gemini model"
     },
     {
@@ -103,6 +117,7 @@
       "model_name": "gemini-1.5-pro-001",
       "full_name": "google/gemini-1.5-pro-001",
       "release_date": "2024-02-15",
+      "max_output_tokens": 8192,
       "description": "Gemini 1.5 Pro – 1 M-token context preview"
     },
     {
@@ -110,6 +125,7 @@
       "model_name": "gemini-2.0-flash-20240520",
       "full_name": "google/gemini-2.0-flash-20240520",
       "release_date": "2024-05-20",
+      "max_output_tokens": 8192,
       "description": "Gemini 2.0 Flash – low-latency variant"
     },
     {
@@ -117,6 +133,7 @@
       "model_name": "gemini-2.5-pro-preview-20250506",
       "full_name": "google/gemini-2.5-pro-preview-20250506",
       "release_date": "2025-05-06",
+      "max_output_tokens": 8192,
       "description": "Gemini 2.5 Pro (I/O preview) – enhanced coding & reasoning"
     },
     {
@@ -124,6 +141,7 @@
       "model_name": "gemini-2.5-flash-preview-20250520",
       "full_name": "google/gemini-2.5-flash-preview-20250520",
       "release_date": "2025-05-20",
+      "max_output_tokens": 8192,
       "description": "Gemini 2.5 Flash preview – speed-optimised 2.5 variant"
     },
     {
@@ -131,7 +149,16 @@
       "model_name": "gemini-2.5-pro-20250605",
       "full_name": "google/gemini-2.5-pro-20250605",
       "release_date": "2025-06-05",
+      "max_output_tokens": 8192,
       "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up"
+    },
+    {
+      "provider": "anthropic",
+      "model_name": "claude-3.5-haiku-20241022",
+      "full_name": "anthropic/claude-3.5-haiku-20241022",
+      "release_date": "2024-10-22",
+      "max_output_tokens": 8192,
+      "description": "Anthropic Claude 3.5 Haiku"
     }
   ],
   "metadata": {

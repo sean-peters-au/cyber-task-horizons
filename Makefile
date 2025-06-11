@@ -5,7 +5,7 @@ PYTHON = uv run python
 HTE_CLI = PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
 
 # Core variables
-MODEL ?= openai/gpt-2
+MODEL ?= openai/gpt2-xl
 NUM_RUNS ?= 1
 SUCCESS_RATE ?= 50
 DATASET ?= cybench
@@ -23,16 +23,18 @@ THIRD_PARTY_REPOS = \
     https://github.com/TellinaTool/nl2bash.git
 
 # --- Model tiers for benchmarking ---
-# Short, fast feedback loop
+# Tier 1: Fastest and cheapest models, for quick checks.
 MODELS_1 = \
 	openai/gpt2-xl \
 	openai/gpt-3.5-turbo \
-	anthropic/claude-3-5-sonnet-20240620 \
+	anthropic/claude-3.5-haiku-20241022 \
 	openai/o4-mini-2025-04-16
 
-# Medium checkpoint sweep (adds a few classic GPT-3 / GPT-4 and newer Claude/Gemini)
+# Tier 2: Mid-range models, a balance of cost and capability.
 MODELS_2 = \
-	$(MODELS_1) \
+	openai/gpt2-xl \
+	openai/gpt-3.5-turbo \
+	openai/o4-mini-2025-04-16 \
 	openai/davinci-002 \
 	openai/gpt-4-0314 \
 	openai/gpt-4-1106-preview \
@@ -40,10 +42,13 @@ MODELS_2 = \
 	anthropic/claude-3-7-sonnet-20250219 \
 	google/gemini-2.5-flash-preview-20250520
 
-# Full, expensive sweep (adds frontier-scale & all remaining GPT-4 variants)
+# Tier 3: Most powerful (and expensive) models, for deep analysis.
 MODELS_3 = \
-	$(MODELS_2) \
+	openai/gpt2-xl \
+	openai/gpt-3.5-turbo \
+	openai/o4-mini-2025-04-16 \
 	google/gemini-2.5-pro-20250605 \
+	anthropic/claude-3-5-sonnet-20241022 \
 	anthropic/claude-opus-4-20250514 \
 	openai/o3-2025-04-16 \
 	openai/gpt-4-0613 \
@@ -103,9 +108,9 @@ help:
 	@echo "Available datasets: cybench, nl2bash, intercode-ctf, cybashbench"
 	@echo ""
 	@echo "Model tiers:"
-	@echo "  TIER=1: gpt2-xl, gpt-3.5-turbo-instruct, claude-3-5-sonnet, o4-mini"
-	@echo "  TIER=2: TIER=1 + davinci-002, gpt-4 variants, newer claude/gemini"
-	@echo "  TIER=3: TIER=2 + frontier models (o3, opus-4, gemini-2.5-pro)"
+	@echo "  TIER=1: gpt2-xl, gpt-3.5-turbo, claude-3.5-haiku, o4-mini"
+	@echo "  TIER=2: davinci-002, classic gpt-4s, sonnet variants, gemini-flash"
+	@echo "  TIER=3: sonnet, frontier models (gemini-pro, opus-4, o3), other gpt-4s"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make repro TIER=1"
