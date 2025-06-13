@@ -27,7 +27,7 @@ THIRD_PARTY_REPOS = \
 MODELS_1 = \
 	openai/gpt2-xl \
 	openai/gpt-3.5-turbo \
-	anthropic/claude-3.5-haiku-20241022 \
+	anthropic/claude-3-5-haiku-20241022 \
 	openai/o4-mini-2025-04-16
 
 # Tier 2: Mid-range models, a balance of cost and capability.
