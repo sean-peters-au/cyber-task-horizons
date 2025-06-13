@@ -8,7 +8,7 @@ human baseline performance, adhering to METR schema.
 import json
 import logging
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from human_ttc_eval.core.prepare import Prepare
 from human_ttc_eval.core.registry import register_preparer
@@ -22,11 +22,43 @@ class InterCodeCTFPrepare(Prepare):
     """Prepares raw InterCode-CTF data into standardized Run objects."""
     
     RAW_FILENAME = "intercode_ctf_raw_data.jsonl"
+    HUMAN_RUNS_FILENAME = "intercode_ctf_human_runs.jsonl"
     
     def __init__(self):
         """Initialize the InterCode-CTF preparer."""
         super().__init__(dataset_name="intercode-ctf")
         self.default_raw_input_filename = self.RAW_FILENAME
+        self.human_time_estimates: Optional[Dict[int, float]] = None
+    
+    def _load_human_time_estimates(self) -> Dict[int, float]:
+        """
+        Loads human time estimates from the manually curated JSONL file.
+        This file is expected to be in data/keep/intercode-ctf/.
+        """
+        if self.human_time_estimates is not None:
+            return self.human_time_estimates
+
+        # The raw_data_dir is usually 'data/raw'. We navigate to 'data/keep'.
+        keep_dir = self.raw_data_dir.parent.parent / "keep" / self.dataset_name
+        estimates_path = keep_dir / self.HUMAN_RUNS_FILENAME
+        
+        if not estimates_path.exists():
+            raise FileNotFoundError(
+                f"Human estimates file not found at expected path: {estimates_path}"
+            )
+        
+        estimates: Dict[int, float] = {}
+        with open(estimates_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                data = json.loads(line)
+                task_id = data.get("task_id")
+                time_sec = data.get("estimated_time_seconds")
+                if task_id is not None and time_sec is not None:
+                    estimates[int(task_id)] = float(time_sec)
+        
+        logger.info(f"Loaded {len(estimates)} human time estimates from {estimates_path}")
+        self.human_time_estimates = estimates
+        return self.human_time_estimates
     
     def _convert_ssh_to_https(self, command: str) -> str:
         """
@@ -163,6 +195,9 @@ class InterCodeCTFPrepare(Prepare):
         """
         logger.info("Starting InterCode-CTF dataset preparation")
         
+        # Load estimates at the beginning of preparation.
+        human_time_estimates = self._load_human_time_estimates()
+        
         raw_input_file = self.raw_data_dir / self.default_raw_input_filename
         if not raw_input_file.exists():
             logger.error(f"Raw InterCode-CTF data file not found: {raw_input_file}")
@@ -183,8 +218,15 @@ class InterCodeCTFPrepare(Prepare):
                     task_id_intercode = raw_data.get("task_id_intercode")
                     description = raw_data.get("description", "")
                     tags = raw_data.get("tags", [])
-                    estimated_time_seconds = raw_data.get("estimated_time_seconds", 210.0)
-                    timing_source = raw_data.get("timing_source", "author_reported_average")
+
+                    if task_id_intercode is None or task_id_intercode not in human_time_estimates:
+                        raise ValueError(
+                            f"Task ID '{task_id_intercode}' from raw data not found in "
+                            f"human estimates file ({self.HUMAN_RUNS_FILENAME}). "
+                            "All tasks must have a time estimate."
+                        )
+                    estimated_time_seconds = human_time_estimates[task_id_intercode]
+                    timing_source = "estimated_human_time"
                     
                     if not task_id_intercode:
                         logger.warning(f"Skipping record in {raw_input_file} (line {line_num}) due to missing 'task_id_intercode'.")
@@ -198,11 +240,7 @@ class InterCodeCTFPrepare(Prepare):
                     task_id = f"{task_family}/task_{task_id_intercode}"
                     
                     # Convert time to minutes
-                    try:
-                        human_minutes = float(estimated_time_seconds) / 60.0
-                    except (TypeError, ValueError):
-                        logger.warning(f"Invalid time format for task '{task_id_intercode}': {estimated_time_seconds}")
-                        human_minutes = 3.5  # Default to 3.5 minutes
+                    human_minutes = float(estimated_time_seconds) / 60.0
                     
                     # Create Run object
                     run_obj = Run(
