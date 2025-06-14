@@ -21,6 +21,7 @@ class CybenchPrepare(Prepare):
     """Prepares raw CyBench data into standardized Run objects."""
     
     RAW_FILENAME = "cybench_raw_data.jsonl"
+    HUMAN_RUNS_FILENAME = "cybench_human_runs.jsonl"
     DEFAULT_VARIANT = "hard"  # Default to hard variant for benchmarking
     
     def __init__(self):
@@ -30,6 +31,37 @@ class CybenchPrepare(Prepare):
         
         # Cache for raw data to avoid re-reading file in get_dataset_task_metadata
         self._raw_data_cache: Dict[str, Dict[str, Any]] = {}
+        self.human_time_estimates: Optional[Dict[str, float]] = None
+    
+    def _load_human_time_estimates(self) -> Dict[str, float]:
+        """
+        Loads human time estimates from the manually curated JSONL file.
+        This file is expected to be in data/keep/cybench/.
+        """
+        if self.human_time_estimates is not None:
+            return self.human_time_estimates
+
+        # The raw_data_dir is usually 'data/raw'. We navigate to 'data/keep'.
+        keep_dir = self.raw_data_dir.parent.parent / "keep" / self.dataset_name
+        estimates_path = keep_dir / self.HUMAN_RUNS_FILENAME
+        
+        if not estimates_path.exists():
+            raise FileNotFoundError(
+                f"Human estimates file not found at expected path: {estimates_path}"
+            )
+        
+        estimates: Dict[str, float] = {}
+        with open(estimates_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                data = json.loads(line)
+                task_id = data.get("task_id")
+                time_sec = data.get("estimated_time_seconds")
+                if task_id is not None and time_sec is not None:
+                    estimates[task_id] = float(time_sec)
+        
+        logger.info(f"Loaded {len(estimates)} human time estimates from {estimates_path}")
+        self.human_time_estimates = estimates
+        return self.human_time_estimates
     
     def get_dataset_task_metadata(self, representative_run: Run) -> Dict[str, Any]:
         """
@@ -136,6 +168,8 @@ class CybenchPrepare(Prepare):
         """
         logger.info("Starting CyBench dataset preparation")
         
+        human_time_estimates = self._load_human_time_estimates()
+
         raw_input_file = self.raw_data_dir / self.default_raw_input_filename
         if not raw_input_file.exists():
             logger.error(f"Raw CyBench data file not found: {raw_input_file}")
@@ -156,21 +190,20 @@ class CybenchPrepare(Prepare):
                     task_id = raw_data.get("task_id")
                     name = raw_data.get("name", "")
                     category = raw_data.get("category", "unknown")
-                    timing_source = raw_data.get("timing_source", "unknown")
-                    
-                    # Get timing data - prefer first_solve_time_seconds
-                    solve_time_seconds = raw_data.get("first_solve_time_seconds")
-                    if solve_time_seconds is None:
-                        # Fallback to fastest_solve_time_seconds if available
-                        solve_time_seconds = raw_data.get("fastest_solve_time_seconds")
                     
                     if not task_id:
                         logger.warning(f"Skipping record in {raw_input_file} (line {line_num}) due to missing 'task_id'.")
                         continue
+
+                    if task_id not in human_time_estimates:
+                        raise ValueError(
+                            f"Task ID '{task_id}' from raw data not found in "
+                            f"human estimates file ({self.HUMAN_RUNS_FILENAME}). "
+                            "All tasks must have a time estimate."
+                        )
                     
-                    if solve_time_seconds is None:
-                        logger.warning(f"Skipping task '{task_id}' due to missing timing data.")
-                        continue
+                    solve_time_seconds = human_time_estimates[task_id]
+                    timing_source = "human_expert_median"
                     
                     # Cache raw data for later use in get_dataset_task_metadata
                     self._raw_data_cache[task_id] = raw_data

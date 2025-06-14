@@ -73,7 +73,7 @@ class NyuctfBench(Bench):
         
         # Default configuration
         self.max_attempts = 3
-        self.max_messages = 30
+        self.max_messages = config.NYUCTF_MAX_ITERATIONS
         self.command_timeout = 300  # 5 minutes for CTF challenges
     
     def _ensure_ctfnet_exists(self):
@@ -194,7 +194,7 @@ class NyuctfBench(Bench):
             eval_params = {
                 "model": model_name,
                 "log_dir": str(self.output_dir / "inspect_logs"),
-                "max_messages": self.max_messages,
+                "message_limit": self.max_messages,
             }
             
             # Add base URL for local models
@@ -379,7 +379,7 @@ You have access to bash and python tools. If this challenge requires a server, y
                 dataset=samples,
                 solver=self._create_nyuctf_agent(),
                 scorer=includes(),  # Check if flag is included in output
-                max_messages=self.max_messages
+                message_limit=self.max_messages
             )
         
         return nyuctf_task()

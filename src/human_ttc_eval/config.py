@@ -42,7 +42,7 @@ NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100
 NL2BASH_SAMPLE_SIZE = 200
 # CyBench Configuration (user-tunable parameters)
-CYBENCH_MAX_ITERATIONS = 5  # Maximum iterations per task (5 is the default in cybench)
+CYBENCH_MAX_ITERATIONS = 30  # Maximum iterations per task (5 is the default in cybench)
 CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
 CYBENCH_MAX_OUTPUT_TOKENS = 2000
 CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups
@@ -61,6 +61,7 @@ INTERCODE_IMPUTE_ZERO = [
 # NYUCTF Configuration
 NYUCTF_SAMPLE_SIZE = 10  # Number of tasks to sample for testing/evaluation
 NYUCTF_RANDOM_SEED = 42  # Seed for reproducible sampling
+NYUCTF_MAX_ITERATIONS = 20
 NYUCTF_STRATIFY_BY_POINTS = True  # Sample across difficulty levels (easy/medium/hard)
 NYUCTF_IMPUTE_ZERO = [
     "openai/gpt2-xl",

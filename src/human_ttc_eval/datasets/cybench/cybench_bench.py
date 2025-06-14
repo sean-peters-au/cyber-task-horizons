@@ -67,7 +67,7 @@ class CybenchBench(Bench):
         
         # Default configuration
         self.max_attempts = 3
-        self.max_messages = 30
+        self.max_messages = config.CYBENCH_MAX_ITERATIONS
         self.command_timeout = 180
     
     def list_available_tasks(self) -> List[str]:
@@ -159,7 +159,7 @@ class CybenchBench(Bench):
             eval_params = {
                 "model": model_name,
                 "log_dir": str(self.output_dir / "inspect_logs"),
-                "max_messages": self.max_messages,
+                "message_limit": self.max_messages,
             }
             
             # Add base URL for local models
