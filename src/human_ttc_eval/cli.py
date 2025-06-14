@@ -18,6 +18,10 @@ from .datasets.nl2bash import nl2bash_prepare # noqa
 from .datasets.nl2bash import nl2bash_describe # noqa
 from .datasets.nl2bash import nl2bash_bench # noqa
 from .datasets.intercode_ctf import intercode_ctf_retrieve # noqa
+from .datasets.nyuctf import nyuctf_retrieve # noqa
+from .datasets.nyuctf import nyuctf_prepare # noqa
+from .datasets.nyuctf import nyuctf_describe # noqa
+from .datasets.nyuctf import nyuctf_bench # noqa
 
 from .core.registry import (
     get_preparer, list_preparers,

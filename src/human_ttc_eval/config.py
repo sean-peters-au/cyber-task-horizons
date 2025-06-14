@@ -58,6 +58,15 @@ INTERCODE_IMPUTE_ZERO = [
     "openai/davinci-002",
 ]
 
+# NYUCTF Configuration
+NYUCTF_SAMPLE_SIZE = 10  # Number of tasks to sample for testing/evaluation
+NYUCTF_RANDOM_SEED = 42  # Seed for reproducible sampling
+NYUCTF_STRATIFY_BY_POINTS = True  # Sample across difficulty levels (easy/medium/hard)
+NYUCTF_IMPUTE_ZERO = [
+    "openai/gpt2-xl",
+    "openai/davinci-002",
+]
+
 # Project Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
