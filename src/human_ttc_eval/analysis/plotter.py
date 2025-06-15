@@ -12,6 +12,8 @@ import yaml
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+import numpy as np
 
 from .transform import transform_benchmark_results
 from .. import config
@@ -127,6 +129,14 @@ def create_horizon_plots(
     )
     logger.info(f"Individual histogram plots generated in {hist_output_dir}")
     
+    # Generate task length distribution histogram
+    dist_plot_file = _plot_task_length_distribution(
+        all_runs_file=all_runs_file,
+        output_dir=output_dir,
+        dataset_filter=dataset_filter
+    )
+    plot_files = [dist_plot_file]
+
     # Convert release_date to proper datetime format
     regressions['release_date'] = pd.to_datetime(regressions['release_date'])
     
@@ -135,7 +145,6 @@ def create_horizon_plots(
         release_dates_dict = yaml.safe_load(f)
     
     # Create plots
-    plot_files = []
     for success_rate in success_rates:
         plot_file = _create_single_horizon_plot(
             regressions=regressions,
@@ -148,7 +157,7 @@ def create_horizon_plots(
         plot_files.append(plot_file)
         logger.info(f"Saved horizon plot to {plot_file}")
     
-    logger.info(f"Generated {len(plot_files)} horizon plots")
+    logger.info(f"Generated {len(plot_files)} total plots")
     return plot_files
 
 
@@ -180,7 +189,7 @@ def _create_single_horizon_plot(
         release_dates=release_dates_dict,
         lower_y_lim=0.01,  # ~30 seconds
         upper_y_lim=10000,  # ~7 days
-        x_lim_start='2024-01-01',
+        x_lim_start='2020-01-01',
         x_lim_end='2025-12-31',
         subtitle='',
         title=title,
@@ -191,6 +200,31 @@ def _create_single_horizon_plot(
         fig=fig
     )
     
+    # Add lines of fit
+    for agent in regressions['agent'].unique():
+        agent_df = regressions[regressions['agent'] == agent].sort_values('release_date')
+        if not agent_df.empty and 'a' in agent_df.columns and 'b' in agent_df.columns:
+            style = plot_params['agent_styling'].get(agent, plot_params['agent_styling']['default'])
+            
+            # Calculate horizon values on the fly
+            horizon_values = agent_df.apply(
+                lambda row: get_x_for_quantile(row['a'], row['b'], success_rate / 100),
+                axis=1
+            )
+            
+            ax.plot(
+                agent_df['release_date'],
+                horizon_values,
+                color=style['lab_color'],
+                linestyle='-',
+                linewidth=2,
+                zorder=5  # Below scatter points but above grid
+            )
+
+    # Re-draw legend to include lines
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1))
+
     # Save plot
     plot_file = output_dir / f"horizon_plot_p{success_rate}.png"
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
@@ -335,4 +369,68 @@ def _create_histogram_plot_params(focus_agents: list) -> dict:
         'suptitle_fontsize': 16,
         'colors': base_colors,
         'markers': base_markers
-    } 
+    }
+
+
+def _plot_task_length_distribution(
+    all_runs_file: Path,
+    output_dir: Path,
+    dataset_filter: Optional[str] = None
+) -> Path:
+    """Plots a stacked histogram of task lengths by dataset."""
+    logger.info("Generating task length distribution histogram...")
+    output_file = output_dir / "task_length_distribution.png"
+    
+    # Load data and get unique tasks
+    runs_df = pd.read_json(all_runs_file, lines=True)
+    if dataset_filter:
+        runs_df = runs_df[runs_df['task_source'] == dataset_filter]
+    tasks_df = runs_df.drop_duplicates(subset=['task_id'])
+    
+    if tasks_df.empty:
+        logger.warning("No tasks found for distribution plot.")
+        return output_file
+        
+    # Prepare data for stacked histogram
+    datasets = sorted(tasks_df['task_source'].unique())
+    data_to_plot = [tasks_df[tasks_df['task_source'] == ds]['human_minutes'] for ds in datasets]
+    colors = ['#4c72b0', '#dd8452', '#55a868', '#c44e52', '#8c564b', '#9467bd', '#e377c2']
+    
+    # Create plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Use logarithmic bins
+    min_time = tasks_df['human_minutes'].min()
+    max_time = tasks_df['human_minutes'].max()
+    if min_time <= 0: min_time = 1/60  # Start at 1 second
+    
+    bins = np.logspace(np.log10(min_time), np.log10(max_time), 30)
+    
+    # Plot stacked histogram
+    ax.hist(data_to_plot, bins=bins, stacked=True, label=datasets, color=colors[:len(datasets)], edgecolor='white')
+    
+    # Formatting
+    ax.set_xscale('log')
+    ax.set_xlabel('Human Time-to-Complete')
+    ax.set_ylabel('Number of Tasks')
+    ax.set_title('Distribution of Task Lengths by Dataset')
+    
+    # Use custom formatter for x-axis ticks
+    def time_formatter(y, pos):
+        if y < 1:
+            return f'{(y * 60):.0f} sec'
+        elif y < 60:
+            return f'{y:.0f} min'
+        else:
+            return f'{y/60:.1f} hr'
+
+    ax.xaxis.set_major_formatter(FuncFormatter(time_formatter))
+    
+    ax.legend(title="Dataset")
+    ax.grid(True, which='major', axis='y', linestyle='--', alpha=0.6)
+    
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    logger.info(f"Saved task length distribution plot to {output_file}")
+    
+    return output_file 
