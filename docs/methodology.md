@@ -132,7 +132,7 @@ Maintain compatibility with METR's release date tracking for trend analysis acro
 - Resource limits and security constraints
 - Randomized flags and credentials per evaluation
 
-## Limitations and Mitigation Strategies
+## Limitations
 
 ### Known Issues
 1. **Annotation Quality**: Highly variable across datasets
@@ -141,12 +141,6 @@ Maintain compatibility with METR's release date tracking for trend analysis acro
 4. **Model Contamination**: Training data may include similar tasks
 5. **Evaluation Budget Constraints**: API cost limitations restrict iteration budgets, potentially underestimating model capabilities
 
-### Mitigation Approaches
-1. **Sensitivity Analysis**: Test results across different annotation assumptions
-2. **Multiple Baselines**: Compare against different expert populations where possible
-3. **Conservative Interpretation**: Emphasize directional trends over precise thresholds
-4. **Open Methodology**: Document all assumptions and limitations transparently
-
 ## Future Improvements
 
 ### Higher-Quality Baselines
@@ -154,18 +148,9 @@ Maintain compatibility with METR's release date tracking for trend analysis acro
 - Multiple expert annotations per task with inter-rater reliability
 - Task-specific validation of AI-generated time estimates
 
-### Expanded Coverage
-- Multi-step campaign scenarios spanning longer time horizons
-- Defensive cybersecurity tasks (not just offensive)
-- Cross-domain transfer assessment
-
-### Enhanced Evaluation
-- Process-level assessment (how tasks are solved, not just success/failure)
-- Adaptive evaluation that responds to model capabilities
-- Integration with red-teaming and safety evaluation frameworks
-
 ### Realistic Evaluation Budgets
 With proper funding, evaluations should provide cost-equivalent API budgets to human contractor fees rather than the current pragmatic constraints. This would enable:
+
 
 - **Generous Iteration Budgets**: Allow models sufficient attempts to solve complex challenges rather than the current 30-command limit that may be inadequate for professional-level tasks
 - **Multiple Evaluation Runs**: Statistical robustness through repeated evaluations rather than single attempts
