@@ -461,6 +461,21 @@ You have access to bash and python tools. If this challenge requires a server, y
                 for service_name, service_config in compose_data['services'].items():
                     if service_name == 'default':
                         continue  # Skip agent service
+                    
+                    # Convert relative build contexts to absolute paths
+                    if 'build' in service_config:
+                        build_config = service_config['build']
+                        if isinstance(build_config, str):
+                            # Simple build path like "build: ."
+                            abs_build_path = str(original_compose_file.parent / build_config)
+                            service_config['build'] = abs_build_path
+                            logger.debug(f"Converted relative build path '{build_config}' to absolute: '{abs_build_path}' for service {service_name}")
+                        elif isinstance(build_config, dict) and 'context' in build_config:
+                            # Build config with context like "build: {context: ./app}"
+                            rel_context = build_config['context']
+                            abs_context = str(original_compose_file.parent / rel_context)
+                            build_config['context'] = abs_context
+                            logger.debug(f"Converted relative build context '{rel_context}' to absolute: '{abs_context}' for service {service_name}")
                         
                     if 'ports' in service_config:
                         new_ports = []
