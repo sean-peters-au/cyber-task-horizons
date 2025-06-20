@@ -1,17 +1,11 @@
 import click
 from pathlib import Path
 import logging
-import sys
 from typing import Optional, List
 
-# Attempt to import dataset modules - comment out unused ones for now
-# try:
-# from .datasets.kypo import parser as kypo_parser_module # noqa
-# from .datasets.kypo import summariser as kypo_summariser_module # noqa
-# from .datasets.kypo import retriever as kypo_retriever_module    # noqa
 from .datasets.cybench import cybench_retrieve # noqa
-from .datasets.cybench import cybench_prepare # noqa # TODO: Rename to cybench_prepare
-from .datasets.cybench import cybench_describe # noqa # TODO: Rename to cybench_describe
+from .datasets.cybench import cybench_prepare # noqa
+from .datasets.cybench import cybench_describe # noqa
 from .datasets.cybench import cybench_bench # noqa
 from .datasets.nl2bash import nl2bash_retrieve # noqa
 from .datasets.nl2bash import nl2bash_prepare # noqa
@@ -22,37 +16,26 @@ from .datasets.nyuctf import nyuctf_retrieve # noqa
 from .datasets.nyuctf import nyuctf_prepare # noqa
 from .datasets.nyuctf import nyuctf_describe # noqa
 from .datasets.nyuctf import nyuctf_bench # noqa
+from .analysis.plotter import create_horizon_plots
 
 from .core.registry import (
-    get_preparer, list_preparers,
-    get_describer, list_describers,
-    get_retriever, list_retrievers,
-    get_bench, list_benches
+    get_preparer,
+    get_describer,
+    get_retriever,
+    get_bench,
 )
-from . import config # Import the project config
+from . import config
 
 # Configure basic logging for the CLI
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 logger = logging.getLogger("human_ttc_eval.cli")
+
 
 @click.group()
 def cli():
     """Human-TTC-Eval: A CLI tool for preparing, describing, retrieving, and benchmarking datasets."""
     pass
 
-@cli.command("list-prepare")
-def cli_list_prepare():
-    """Lists all available dataset preparers."""
-    try:
-        preparers = list_preparers()
-        if preparers:
-            click.echo("Available preparers:")
-            for p_name in preparers:
-                click.echo(f"- {p_name}")
-        else:
-            click.echo("No preparers registered.")
-    except Exception as e:
-        click.echo(f"Error listing preparers: {e}", err=True)
 
 @cli.command("prepare")
 @click.argument("dataset_name", type=str)
@@ -84,20 +67,6 @@ def cli_prepare(dataset_name: str):
         click.echo(f"An unexpected error occurred during preparation of '{dataset_name}': {e}", err=True)
         logger.error(f"Unexpected error during preparation of '{dataset_name}':", exc_info=True)
 
-
-@cli.command("list-describe")
-def cli_list_describe():
-    """Lists all available dataset describers (formerly summarisers)."""
-    try:
-        describers = list_describers()
-        if describers:
-            click.echo("Available describers:")
-            for d_name in describers:
-                click.echo(f"- {d_name}")
-        else:
-            click.echo("No describers registered.")
-    except Exception as e:
-        click.echo(f"Error listing describers: {e}", err=True)
 
 @cli.command("describe")
 @click.argument("dataset_name", type=str)
@@ -136,26 +105,7 @@ def cli_describe(dataset_name: str):
         click.echo(f"An unexpected error occurred during description of '{dataset_name}': {e}", err=True)
         logger.error(f"Unexpected error during description of '{dataset_name}':", exc_info=True)
 
-@cli.group("retrieve")
-def cli_retrieve_group():
-    """Commands for retrieving raw data for datasets."""
-    pass
-
-@cli_retrieve_group.command("list") # Becomes `retrieve list`
-def cli_retrieve_list():
-    """Lists all available dataset retrievers."""
-    try:
-        retrievers = list_retrievers()
-        if retrievers:
-            click.echo("Available retrievers:")
-            for r_name in retrievers:
-                click.echo(f"- {r_name}")
-        else:
-            click.echo("No retrievers registered.")
-    except Exception as e:
-        click.echo(f"Error listing retrievers: {e}", err=True)
-
-@cli_retrieve_group.command("run")
+@cli.command("retrieve")
 @click.argument("dataset_name", type=str)
 def cli_retrieve_run(dataset_name: str):
     """Retrieves raw data for a specified dataset."""
@@ -189,22 +139,8 @@ def cli_retrieve_run(dataset_name: str):
         click.echo(f"An unexpected error occurred during '{dataset_name}' retrieval: {e}", err=True)
         logger.error(f"Unexpected error during '{dataset_name}' retrieval: {e}", exc_info=True)
 
-@cli.command("list-bench")
-def cli_list_bench():
-    """Lists all available dataset benchmark runners."""
-    try:
-        benches = list_benches() # Uses list_benches from registry
-        if benches:
-            click.echo("Available benchmark runners:")
-            for b_name in benches:
-                click.echo(f"- {b_name}")
-        else:
-            click.echo("No benchmark runners registered.")
-    except Exception as e:
-        click.echo(f"Error listing benchmark runners: {e}", err=True)
-
 @cli.command("benchmark")
-@click.argument("dataset_name", type=str) # Renamed from 'dataset'
+@click.argument("dataset_name", type=str)
 @click.option("--model", required=True, 
               help="Model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-3-opus')")
 @click.option("--num-runs", default=1, type=int, show_default=True,
@@ -310,52 +246,56 @@ def cli_plot(dataset: Optional[str], success_rate: int):
         click.echo("Error: Success rate must be between 0 and 100", err=True)
         return
     
+    # Check if we have any benchmark results
+    benchmarks_dir = config.RESULTS_DIR / "benchmarks"
+    if not benchmarks_dir.exists() or not any(benchmarks_dir.iterdir()):
+        click.echo(f"Error: No benchmark results found in {benchmarks_dir}", err=True)
+        click.echo("Run benchmarks first using 'benchmark' command.", err=True)
+        return
+    
+    # Check if METR code is available
+    metr_path = config.THIRD_PARTY_DIR / "eval-analysis-public"
+    if not metr_path.exists():
+        click.echo(f"Error: METR analysis code not found at {metr_path}", err=True)
+        click.echo("Run 'make setup' to clone required repositories.", err=True)
+        return
+    
+    click.echo(f"Generating METR-style horizon plots at {success_rate}% success rate...")
+    if dataset:
+        click.echo(f"Filtering to dataset: {dataset}")
+    else:
+        click.echo("Processing all available datasets")
+    
+    # Generate plots using METR's methodology
+    plot_files = create_horizon_plots(
+        success_rates=[success_rate],
+        dataset_filter=dataset
+    )
+    
+    # Generate task analysis plots
     try:
-        from .analysis.plotter import create_horizon_plots
-        
-        # Check if we have any benchmark results
-        benchmarks_dir = config.RESULTS_DIR / "benchmarks"
-        if not benchmarks_dir.exists() or not any(benchmarks_dir.iterdir()):
-            click.echo(f"Error: No benchmark results found in {benchmarks_dir}", err=True)
-            click.echo("Run benchmarks first using 'benchmark' command.", err=True)
-            return
-        
-        # Check if METR code is available
-        metr_path = config.THIRD_PARTY_DIR / "eval-analysis-public"
-        if not metr_path.exists():
-            click.echo(f"Error: METR analysis code not found at {metr_path}", err=True)
-            click.echo("Run 'make setup' to clone required repositories.", err=True)
-            return
-        
-        click.echo(f"Generating METR-style horizon plots at {success_rate}% success rate...")
-        if dataset:
-            click.echo(f"Filtering to dataset: {dataset}")
-        else:
-            click.echo("Processing all available datasets")
-        
-        # Generate plots using METR's methodology
-        plot_files = create_horizon_plots(
-            success_rates=[success_rate],
+        from .analysis.task_plots import create_task_analysis_plots
+        click.echo("Generating task analysis plots...")
+        task_analysis_files = create_task_analysis_plots(
+            output_dir=config.RESULTS_DIR / "plots",
             dataset_filter=dataset
         )
-        
-        if plot_files:
-            output_dir = config.RESULTS_DIR / "plots"
-            click.echo(f"✅ Horizon plots generated successfully!")
-            click.echo(f"📊 Generated {len(plot_files)} plots using METR's methodology")
-            click.echo(f"📁 Plots saved to: {output_dir}")
-            
-            for plot_file in plot_files:
-                click.echo(f"   • {plot_file.name}")
-        else:
-            click.echo("⚠️  No plots generated. Check if benchmark results contain successful runs.", err=True)
-        
-    except ImportError as e:
-        click.echo(f"Error: Could not import required modules: {e}", err=True)
-        click.echo("Ensure all dependencies are installed.", err=True)
+        plot_files.extend(task_analysis_files)
+        click.echo(f"✅ Generated {len(task_analysis_files)} task analysis plot(s)")
     except Exception as e:
-        click.echo(f"An unexpected error occurred: {e}", err=True)
-        logger.error(f"Unexpected error during plotting: {e}", exc_info=True)
+        click.echo(f"⚠️  Task analysis plots failed: {e}", err=True)
+        logger.error(f"Task analysis error: {e}", exc_info=True)
+    
+    if plot_files:
+        output_dir = config.RESULTS_DIR / "plots"
+        click.echo(f"✅ Horizon plots generated successfully!")
+        click.echo(f"📊 Generated {len(plot_files)} plots using METR's methodology")
+        click.echo(f"📁 Plots saved to: {output_dir}")
+        
+        for plot_file in plot_files:
+            click.echo(f"   • {plot_file.name}")
+    else:
+        click.echo("⚠️  No plots generated. Check if benchmark results contain successful runs.", err=True)
 
 if __name__ == "__main__":
     cli() 
