@@ -9,7 +9,6 @@ than exact match.
 import json
 import logging
 import uuid
-from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
@@ -20,7 +19,6 @@ from human_ttc_eval.core.local_models import (
     validate_local_server,
     LOCAL_MODEL_CONFIGS
 )
-from human_ttc_eval import config
 
 import inspect_ai
 from inspect_ai import eval as inspect_eval
