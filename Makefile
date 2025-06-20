@@ -128,7 +128,7 @@ datasets: describe-all
 # --- Generic Dataset Targets ---
 retrieve: third-party
 	@echo ">>> Retrieving $(DATASET) raw data using CLI..."
-	$(HTE_CLI) retrieve run $(DATASET)
+	$(HTE_CLI) retrieve $(DATASET)
 
 prepare: retrieve
 	@echo ">>> Preparing $(DATASET) raw data into METR format using CLI..."

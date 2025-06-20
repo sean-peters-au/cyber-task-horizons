@@ -1,6 +1,5 @@
 # Core functionality
 from .bench import Bench, BenchResult
-from .inspect_bench import InspectBench
 from .registry import register_bench, get_bench, list_benches
 from .registry import register_retriever, get_retriever, list_retrievers
 from .registry import register_preparer, get_preparer, list_preparers
