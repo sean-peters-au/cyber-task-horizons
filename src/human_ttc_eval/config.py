@@ -61,7 +61,7 @@ INTERCODE_IMPUTE_ZERO = [
 # NYUCTF Configuration
 NYUCTF_SAMPLE_SIZE = 50
 NYUCTF_RANDOM_SEED = 42
-NYUCTF_MAX_ITERATIONS = 20
+NYUCTF_MAX_ITERATIONS = 40
 NYUCTF_STRATIFY_BY_POINTS = True  # Sample across difficulty levels (easy/medium/hard)
 NYUCTF_IMPUTE_ZERO = [
     "openai/gpt2-xl",
