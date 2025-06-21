@@ -6,7 +6,8 @@
       "full_name": "openai/gpt2",
       "release_date": "2019-02-14",
       "max_output_tokens": 1024,
-      "description": "GPT-2 base model (117 M parameters)"
+      "description": "GPT-2 base model (117 M parameters)",
+      "alias": "GPT-2"
     },
     {
       "provider": "openai",
@@ -14,7 +15,8 @@
       "full_name": "openai/gpt2-xl",
       "release_date": "2019-11-05",
       "max_output_tokens": 1024,
-      "description": "GPT-2 XL model (1.5 B parameters)"
+      "description": "GPT-2 XL model (1.5 B parameters)",
+      "alias": "GPT 2"
     },
     {
       "provider": "openai",
@@ -22,7 +24,8 @@
       "full_name": "openai/davinci-002",
       "release_date": "2020-07-11",
       "max_output_tokens": 4096,
-      "description": "GPT-3 (text-davinci-002) - 175 B parameters, RLHF instruct tuning"
+      "description": "GPT-3 (davinci-002) - 175 B parameters, RLHF instruct tuning",
+      "alias": "GPT 3"
     },
     {
       "provider": "openai",
@@ -30,7 +33,8 @@
       "full_name": "openai/gpt-3.5-turbo",
       "release_date": "2022-03-15",
       "max_output_tokens": 4096,
-      "description": "GPT-3.5 Turbo - chat model, optimized for conversational use"
+      "description": "GPT-3.5 Turbo - chat model, optimized for conversational use",
+      "alias": "GPT 3.5"
     },
     {
       "provider": "openai",
@@ -38,7 +42,8 @@
       "full_name": "openai/gpt-4-0314",
       "release_date": "2023-03-14",
       "max_output_tokens": 8192,
-      "description": "GPT-4 initial 8 K context release"
+      "description": "GPT-4 initial 8 K context release",
+      "alias": "GPT 4"
     },
     {
       "provider": "openai",
@@ -54,7 +59,8 @@
       "full_name": "openai/o3-mini-2025-01-31",
       "release_date": "2025-01-31",
       "max_output_tokens": 4096,
-      "description": "o3-mini – small deliberative model (successor to o1-mini)"
+      "description": "o3-mini – small deliberative model (successor to o1-mini)",
+      "alias": "O3 Mini"
     },
     {
       "provider": "openai",
@@ -62,7 +68,8 @@
       "full_name": "openai/o3-2025-04-16",
       "release_date": "2025-04-16",
       "max_output_tokens": 8192,
-      "description": "OpenAI o3 – flagship reasoning model with tool-use & vision"
+      "description": "OpenAI o3 – flagship reasoning model with tool-use & vision",
+      "alias": "O3"
     },
     {
       "provider": "openai",
@@ -70,7 +77,8 @@
       "full_name": "openai/o4-mini-2025-04-16",
       "release_date": "2025-04-16",
       "max_output_tokens": 8192,
-      "description": "o4-mini – cost-efficient successor to o3-mini"
+      "description": "o4-mini – cost-efficient successor to o3-mini",
+      "alias": "O4 Mini"
     },
     {
       "provider": "anthropic",
@@ -78,7 +86,8 @@
       "full_name": "anthropic/claude-3-5-sonnet-20240620",
       "release_date": "2024-06-20",
       "max_output_tokens": 8192,
-      "description": "Claude 3.5 Sonnet (June snapshot) – balanced speed / quality"
+      "description": "Claude 3.5 Sonnet (June snapshot) – balanced speed / quality",
+      "alias": "Claude 3.5 Sonnet (June 2024)"
     },
     {
       "provider": "anthropic",
@@ -86,7 +95,8 @@
       "full_name": "anthropic/claude-3-5-sonnet-20241022",
       "release_date": "2024-10-22",
       "max_output_tokens": 8192,
-      "description": "Claude 3.5 Sonnet (Oct snapshot) – incremental upgrade"
+      "description": "Claude 3.5 Sonnet (Oct snapshot) – incremental upgrade",
+      "alias": "Claude 3.5 Sonnet (Oct 2024)"
     },
     {
       "provider": "anthropic",
@@ -94,7 +104,8 @@
       "full_name": "anthropic/claude-3-7-sonnet-20250219",
       "release_date": "2025-02-19",
       "max_output_tokens": 8192,
-      "description": "Claude 3.7 Sonnet – stronger coding & reasoning"
+      "description": "Claude 3.7 Sonnet – stronger coding & reasoning",
+      "alias": "Claude 3.7 Sonnet"
     },
     {
       "provider": "anthropic",
@@ -102,7 +113,8 @@
       "full_name": "anthropic/claude-opus-4-20250514",
       "release_date": "2025-05-14",
       "max_output_tokens": 8192,
-      "description": "Claude 4 Opus – Anthropic's frontier-level model"
+      "description": "Claude 4 Opus – Anthropic's frontier-level model",
+      "alias": "Claude 4 Opus"
     },
     {
       "provider": "google",
@@ -150,7 +162,8 @@
       "full_name": "google/gemini-2.5-pro-preview-06-05",
       "release_date": "2025-06-05",
       "max_output_tokens": 8192,
-      "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up"
+      "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up",
+      "alias": "Gemini 2.5 Pro (June 2025)"
     },
     {
       "provider": "anthropic",
@@ -158,7 +171,8 @@
       "full_name": "anthropic/claude-3.5-haiku-20241022",
       "release_date": "2024-10-22",
       "max_output_tokens": 8192,
-      "description": "Anthropic Claude 3.5 Haiku"
+      "description": "Anthropic Claude 3.5 Haiku",
+      "alias": "Claude 3.5 Haiku"
     }
   ],
   "metadata": {

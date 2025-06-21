@@ -36,7 +36,7 @@ def transform_benchmark_results(output_dir: Path) -> Dict[str, Path]:
     
     # Load models registry
     models_registry_file = Path(__file__).parent.parent / "models.json"
-    model_details_map = _load_models_registry(models_registry_file)
+    model_details, name_to_canonical = _load_models_registry(models_registry_file)
     
     # Load all human baselines from processed data
     human_baselines = _load_all_human_baselines()
@@ -58,7 +58,8 @@ def transform_benchmark_results(output_dir: Path) -> Dict[str, Path]:
                 runs.extend(_process_benchmark_file(
                     result_file, 
                     human_baselines, 
-                    model_details_map,
+                    model_details,
+                    name_to_canonical,
                     dataset_name
                 ))
             except Exception as e:
@@ -99,7 +100,7 @@ def transform_benchmark_results(output_dir: Path) -> Dict[str, Path]:
     
     # Create release_dates.yaml
     unique_agents = set(r['agent'] for r in runs)
-    release_dates_data = _create_release_dates(unique_agents, model_details_map)
+    release_dates_data = _create_release_dates(unique_agents, model_details)
     
     dates_file = output_dir / "release_dates.yaml"
     with open(dates_file, 'w') as f:
@@ -114,32 +115,48 @@ def transform_benchmark_results(output_dir: Path) -> Dict[str, Path]:
     }
 
 
-def _load_models_registry(models_registry_file: Path) -> Dict[str, Dict[str, Any]]:
-    """Load and parse the models registry."""
-    model_details_map = {}
-    
+def _load_models_registry(
+    models_registry_file: Path,
+) -> (Dict[str, Dict[str, Any]], Dict[str, str]):
+    """
+    Load models registry and create mappings for robust lookup.
+
+    Returns:
+        model_details: A dict mapping canonical full_name to details (alias, release_date).
+        name_to_canonical: A dict mapping various possible names to the canonical full_name.
+    """
+    model_details = {}
+    name_to_canonical = {}
+
     try:
-        with open(models_registry_file, 'r') as f:
+        with open(models_registry_file, "r") as f:
             models_data = json.load(f)
-        
-        models_list = models_data.get('models', [])
+
+        models_list = models_data.get("models", [])
         if not isinstance(models_list, list):
             logger.error(f"Models registry format error: 'models' should be a list")
-            return model_details_map
-            
-        for model_entry in models_list:
-            full_name = model_entry.get('full_name')
-            if full_name:
-                model_details_map[full_name] = {
-                    'release_date': model_entry.get('release_date', '2024-01-01'),
-                    'display_name': model_entry.get('display_name', full_name),
-                    'metr_id': model_entry.get('metr_id', model_entry.get('display_name', full_name))
-                }
-                
+            return {}, {}
+
+        for entry in models_list:
+            full_name = entry.get("full_name")
+            if not full_name:
+                continue
+
+            details = {
+                "release_date": entry.get("release_date", "2024-01-01"),
+                "alias": entry.get("alias", full_name),
+            }
+            model_details[full_name] = details
+
+            # Map all known names to the canonical full_name
+            name_to_canonical[full_name] = full_name
+            if entry.get("model_name"):
+                name_to_canonical[entry["model_name"]] = full_name
+
     except Exception as e:
         logger.error(f"Error loading models registry: {e}")
-        
-    return model_details_map
+
+    return model_details, name_to_canonical
 
 
 def _load_all_human_baselines() -> Dict[str, float]:
@@ -174,14 +191,23 @@ def _load_all_human_baselines() -> Dict[str, float]:
 def _process_benchmark_file(
     result_file: Path,
     human_baselines: Dict[str, float],
-    model_details_map: Dict[str, Dict[str, Any]],
-    dataset_name: str
+    model_details: Dict[str, Dict[str, Any]],
+    name_to_canonical: Dict[str, str],
+    dataset_name: str,
 ) -> List[Dict[str, Any]]:
     """Process a single benchmark result file."""
     runs = []
     
     with open(result_file, 'r') as f:
-        result = json.load(f)
+        try:
+            result = json.load(f)
+        except json.JSONDecodeError:
+            logger.warning(f"Could not decode JSON from {result_file}")
+            return []
+
+    if not isinstance(result, dict):
+        logger.debug(f"Skipping non-dictionary JSON file: {result_file}")
+        return []
     
     if not result.get('success', True):
         logger.debug(f"Skipping failed result file: {result_file}")
@@ -193,13 +219,21 @@ def _process_benchmark_file(
         logger.debug(f"No runs/task_results in {result_file}")
         return runs
     
-    model_full_name = result.get('model_name', '')
-    model_info = model_details_map.get(model_full_name, {})
-    
-    # METR expects 'agent' field for logistic regression
-    agent_name_for_metr = model_info.get('metr_id', model_full_name)
-    # 'alias' is for display in plots
-    alias_for_plotting = model_info.get('display_name', model_full_name)
+    model_name_from_file = result.get("model_name", "")
+    canonical_name = name_to_canonical.get(model_name_from_file)
+
+    if not canonical_name:
+        logger.warning(
+            f"Could not resolve model '{model_name_from_file}' in '{result_file.name}' "
+            "to a known model in models.json. It will appear with a default name and styling."
+        )
+        canonical_name = model_name_from_file
+        alias_for_plotting = model_name_from_file
+    else:
+        alias_for_plotting = model_details[canonical_name]["alias"]
+
+    # The 'agent' field MUST be the canonical name for everything to work.
+    agent_name_for_metr = canonical_name
     
     for task_result in task_results:
         # For runs that are already in METR format, just update agent/alias
@@ -208,7 +242,7 @@ def _process_benchmark_file(
             run = task_result.copy()
             run['agent'] = agent_name_for_metr
             run['alias'] = alias_for_plotting
-            run['model'] = model_full_name
+            run['model'] = model_name_from_file
             run['task_source'] = dataset_name
             
             # METR expects 'weight' field - use equal_task_weight by default
@@ -238,7 +272,7 @@ def _process_benchmark_file(
             run = {
                 'agent': agent_name_for_metr,
                 'alias': alias_for_plotting,
-                'model': model_full_name,
+                'model': model_name_from_file, # Keep original name for debugging
                 'task_id': task_id,
                 'score_binarized': 1 if success else 0,
                 'human_minutes': human_minutes,
@@ -254,20 +288,15 @@ def _process_benchmark_file(
 
 def _create_release_dates(
     unique_agents: set,
-    model_details_map: Dict[str, Dict[str, Any]]
+    model_details: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, str]]:
     """Create release dates mapping for METR format."""
     release_dates = {}
     
     for agent in unique_agents:
-        # Find the model entry that maps to this agent
-        release_date = "2024-01-01"  # default
-        
-        for full_name, details in model_details_map.items():
-            if details.get('metr_id') == agent:
-                release_date = details.get('release_date', "2024-01-01")
-                break
-        
+        # agent is now the canonical full_name
+        details = model_details.get(agent, {})
+        release_date = details.get("release_date", "2024-01-01")
         release_dates[agent] = release_date
     
     return {"date": release_dates} 

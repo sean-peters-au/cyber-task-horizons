@@ -7,14 +7,21 @@ Wrapper around METR's logistic regression and plotting functions.
 import sys
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import yaml
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import numpy as np
+import warnings
+from matplotlib.axes import Axes
+from matplotlib.dates import date2num
+from sklearn.metrics import r2_score
+from sklearn.linear_model import LogisticRegression, LinearRegression
 
 from .transform import transform_benchmark_results
+from .token_analysis import extract_tokens_from_eval_logs, create_token_plots
+from ..core.run import Run
 from .. import config
 
 # Add METR code to path
@@ -38,7 +45,8 @@ logger = logging.getLogger(__name__)
 def create_horizon_plots(
     output_dir: Optional[Path] = None,
     success_rates: List[int] = None,
-    dataset_filter: Optional[str] = None
+    dataset_filter: Optional[str] = None,
+    n_bootstraps: int = 500,
 ) -> List[Path]:
     """
     Create METR-style horizon plots from all benchmark results.
@@ -52,6 +60,7 @@ def create_horizon_plots(
         output_dir: Directory to save plots (default: config.RESULTS_DIR / "plots")
         success_rates: List of success rate percentages (default: [50])
         dataset_filter: Optional dataset name to filter results
+        n_bootstraps: Number of bootstrap iterations for confidence intervals
         
     Returns:
         List of paths to generated plot files
@@ -143,20 +152,52 @@ def create_horizon_plots(
     with open(release_dates_file, 'r') as f:
         release_dates_dict = yaml.safe_load(f)
     
+    # Perform bootstrapping to generate data for confidence intervals
+    bootstrap_results_file = _perform_bootstrapping(
+        all_runs_file=all_runs_file,
+        output_dir=output_dir,
+        n_bootstraps=n_bootstraps,
+    )
+
     # Create plots
     for success_rate in success_rates:
+        # Create combined plot
         plot_file = _create_single_horizon_plot(
             regressions=regressions,
             runs_df=runs_df,
             release_dates_dict=release_dates_dict,
             success_rate=success_rate,
             output_dir=output_dir,
-            dataset_filter=dataset_filter
+            bootstrap_results_file=bootstrap_results_file,
         )
         plot_files.append(plot_file)
         logger.info(f"Saved horizon plot to {plot_file}")
-    
+        
+        # Create plots for each dataset filter
+        if dataset_filter:
+            filtered_regressions = regressions[regressions['task_source'] == dataset_filter]
+            filtered_runs_df = runs_df[runs_df['task_source'] == dataset_filter]
+            if not filtered_regressions.empty:
+                output_paths.append(
+                    _create_single_horizon_plot(
+                        regressions=filtered_regressions,
+                        runs_df=filtered_runs_df,
+                        release_dates_dict=release_dates_dict,
+                        success_rate=success_rate,
+                        output_dir=output_dir,
+                        dataset_filter=dataset_filter,
+                        bootstrap_results_file=bootstrap_results_file,
+                    )
+                )
+                logger.info(f"Saved horizon plot to {output_paths[-1]}")
+
     logger.info(f"Generated {len(plot_files)} total plots")
+    
+    # Generate token analysis plots
+    token_plot_files = _generate_token_plots(runs_df, output_dir)
+    plot_files.extend(token_plot_files)
+    
+    logger.info(f"Generated {len(plot_files)} total plots (including token analysis)")
     return plot_files
 
 
@@ -166,17 +207,22 @@ def _create_single_horizon_plot(
     release_dates_dict: dict,
     success_rate: int,
     output_dir: Path,
-    dataset_filter: Optional[str] = None
+    dataset_filter: Optional[str] = None,
+    bootstrap_results_file: Optional[Path] = None,
 ) -> Path:
     """Create a single horizon plot."""
     # Create plot configuration
     plot_params = _create_plot_params(regressions['agent'].unique())
     
+    # Debug logging
+    logger.info(f"Agents in regressions: {sorted(regressions['agent'].unique())}")
+    logger.info(f"Agents in plot_params['agent_styling']: {sorted(plot_params['agent_styling'].keys())}")
+    
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 8))
     
     # Determine title
-    title = f'AI Agent Horizon at {success_rate}% Success Rate'
+    title = f'Model Offensive Cybersecurity Horizon at {success_rate}% Success Rate'
     if dataset_filter:
         title += f' ({dataset_filter})'
     
@@ -187,9 +233,9 @@ def _create_single_horizon_plot(
         runs_df=runs_df,
         release_dates=release_dates_dict,
         lower_y_lim=0.01,  # ~30 seconds
-        upper_y_lim=10000,  # ~7 days
-        x_lim_start='2020-01-01',
-        x_lim_end='2025-12-31',
+        upper_y_lim=240,  # 4 hours in minutes
+        x_lim_start='2019-01-01',
+        x_lim_end='2026-01-01',
         subtitle='',
         title=title,
         weight_key='weight',
@@ -198,43 +244,109 @@ def _create_single_horizon_plot(
         confidence_level=0.8,
         fig=fig
     )
+
+    sota_models_for_fit = [
+        'google/gemini-2.5-pro-preview-06-05',
+        'openai/davinci-002',
+        'anthropic/claude-3-5-sonnet-20240620',
+        'openai/gpt-3.5-turbo',
+    ]
     
-    # Add lines of fit
-    for agent in regressions['agent'].unique():
-        agent_df = regressions[regressions['agent'] == agent].sort_values('release_date')
-        if not agent_df.empty and 'a' in agent_df.columns and 'b' in agent_df.columns:
-            style = plot_params['agent_styling'].get(agent, plot_params['agent_styling']['default'])
-            
-            # Calculate horizon values on the fly
-            horizon_values = agent_df.apply(
-                lambda row: get_x_for_quantile(row['a'], row['b'], success_rate / 100),
-                axis=1
-            )
-            
-            ax.plot(
-                agent_df['release_date'],
-                horizon_values,
-                color=style['lab_color'],
-                linestyle='-',
-                linewidth=2,
-                zorder=5  # Below scatter points but above grid
-            )
+    # Get axis limits from the existing plot for trendline and CI
+    x_lim_dates = ax.get_xlim()
+    ax_min_date_num, ax_max_date_num = x_lim_dates
+    ax_min_date = pd.to_datetime(ax_min_date_num, unit='D')
+    ax_max_date = pd.to_datetime(ax_max_date_num, unit='D')
 
-    # Re-draw legend to include lines
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1))
-
-    # Save plot
-    plot_file = output_dir / f"horizon_plot_p{success_rate}.png"
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    plt.close()
+    # Add a line of best fit for selected models using METR's functions
+    regressions_for_fit = regressions[regressions['agent'].isin(sota_models_for_fit)].copy()
     
-    return plot_file
+    if len(regressions_for_fit) > 1:
+        reg, score = fit_trendline(
+            regressions_for_fit[f'p{success_rate}'],
+            pd.to_datetime(regressions_for_fit['release_date']),
+            log_scale=True
+        )
+        if reg:
+            # Get the date range for the trendline
+            fit_min_date = pd.to_datetime(regressions_for_fit['release_date']).min()
+            fit_max_date = pd.to_datetime(regressions_for_fit['release_date']).max()
+            
+            # Debug: Show main trendline details
+            logger.info(f"Main trendline calculated from {len(regressions_for_fit)} SOTA models")
+            logger.info(f"SOTA models used: {regressions_for_fit['agent'].tolist()}")
+            logger.info(f"Main p50 values: {regressions_for_fit[f'p{success_rate}'].tolist()}")
+            logger.info(f"Main trendline slope: {reg.coef_[0]:.6f}")
+            logger.info(f"Main trendline doubling time: {np.log(2) / reg.coef_[0]:.1f} days")
+            
+            # Add bootstrap confidence interval for the trendline
+            if bootstrap_results_file and bootstrap_results_file.exists():
+                # Use the new proper bootstrap method
+                _add_bootstrap_confidence_region_for_trendline(
+                    ax=ax,
+                    sota_p50s=regressions_for_fit[f'p{success_rate}'].tolist(),
+                    sota_dates=regressions_for_fit['release_date'].tolist(),
+                    confidence_level=0.95,
+                    n_bootstraps=1000
+                )
+
+            # Plot the main trendline on top of the CI
+            plot_trendline(
+                ax=ax,
+                reg=reg,
+                score=score,
+                line_start_date=fit_min_date.strftime('%Y-%m-%d'),
+                line_end_date=fit_max_date.strftime('%Y-%m-%d'),
+                log_scale=True
+            )
+
+    # Manually build the legend to ensure all agents are included and correctly ordered.
+    legend_handles = []
+
+    # Get a map from the agent's full_name to its desired alias for the legend.
+    agent_to_alias = runs_df.drop_duplicates(subset=['agent']).set_index('agent')['alias']
+    
+    # Sort agents by release date to ensure the legend is chronological.
+    sorted_agents_df = regressions[['agent', 'release_date']].drop_duplicates()
+    sorted_agents = sorted_agents_df.sort_values('release_date')['agent'].tolist()
+    
+    for agent in sorted_agents:
+        # Skip any agent that doesn't have styling info (shouldn't happen).
+        if agent not in plot_params['agent_styling']:
+            continue
+            
+        style = plot_params['agent_styling'][agent]
+        label = agent_to_alias.get(agent, agent) # Use alias, fallback to full name.
+        
+        # Create a proxy artist for the legend.
+        handle = plt.Line2D(
+            [0], [0],
+            marker=style.get('marker', 'o'),
+            color=style.get('lab_color', 'blue'),
+            linestyle='None',
+            markersize=10,
+            label=label
+        )
+        legend_handles.append(handle)
+
+    ax.legend(handles=legend_handles, loc='upper right')
+
+    # Add title and save
+    ax.set_title(title, fontsize=16)
+    fig.tight_layout()
+    output_file = output_dir / f"horizon_plot_p{success_rate}{f'_{dataset_filter}' if dataset_filter else ''}.png"
+    fig.savefig(output_file)
+    logger.info(f"Saved horizon plot to {output_file}")
+    plt.close(fig)
+    return output_file
 
 
-def _create_plot_params(unique_agents: list) -> dict:
-    """Create plot parameters for METR functions."""
-    # Base styling
+def _create_plot_params(agents: List[str]) -> Dict:
+    """
+    Create plot parameters compatible with METR's plotting functions,
+    but with expanded styling to support more agents.
+    """
+    # Base styling from METR's defaults
     plot_params = {
         'scatter_styling': {
             'error_bar': {
@@ -247,7 +359,7 @@ def _create_plot_params(unique_agents: list) -> dict:
         'agent_styling': {
             'default': {'lab_color': 'blue', 'marker': 'o'}
         },
-        'legend_order': list(unique_agents),
+        'legend_order': agents,
         'ax_label_fontsize': 14,
         'title_fontsize': 16,
         'annotation_fontsize': 12,
@@ -255,17 +367,26 @@ def _create_plot_params(unique_agents: list) -> dict:
         'ylabelpad': 10,
         'suptitle_fontsize': 14
     }
+
+    # Expanded colors and markers to handle many agents
+    colors = [
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+        '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
+        '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5'
+    ]
+    markers = [
+        'o', 'v', '^', '<', '>', 's', 'p', '*', 'h', 'H',
+        'D', 'd', 'P', 'X', 'o', 'v', '^', '<', '>', 's'
+    ]
     
-    # Agent-specific styling
-    colors = ['#3e805f', '#e26e2f', '#4285f4', '#9333ea', '#f59e0b']
-    markers = ['o', 's', '^', 'D', 'v']
-    
-    for i, agent in enumerate(unique_agents):
+    # Assign a unique color and marker to each agent
+    for i, agent in enumerate(agents):
         plot_params['agent_styling'][agent] = {
             'lab_color': colors[i % len(colors)],
             'marker': markers[i % len(markers)]
         }
-    
+        
     return plot_params
 
 
@@ -288,7 +409,19 @@ def _generate_individual_histograms(
         logger.error("'alias' column not found in all_runs_df")
         return output_file
     
-    focus_agents = agent_summaries_df["agent"].unique().tolist()
+    # Sort agents by release date for consistent plot ordering
+    if "release_date" in agent_summaries_df.columns:
+        agent_summaries_df["release_date"] = pd.to_datetime(
+            agent_summaries_df["release_date"]
+        )
+        sorted_agents = agent_summaries_df.sort_values("release_date")
+        focus_agents = sorted_agents["agent"].tolist()
+    else:
+        focus_agents = agent_summaries_df["agent"].unique().tolist()
+        logger.warning(
+            "'release_date' column not found in logistic_fits_file. Plots will not be sorted by date."
+        )
+        
     if not focus_agents:
         logger.warning("No agents found in logistic_fits_file")
         return output_file
@@ -330,6 +463,60 @@ def _generate_individual_histograms(
         logger.error(f"Error generating individual histogram plot: {e}", exc_info=True)
     
     return output_file
+
+
+def _generate_token_plots(runs_df: pd.DataFrame, output_dir: Path) -> List[Path]:
+    """Generate token analysis plots from inspect_ai logs."""
+    logger.info("Starting token analysis...")
+    
+    # Create token analysis output directory
+    token_output_dir = output_dir / "token_analysis"
+    token_output_dir.mkdir(exist_ok=True)
+    
+    # Convert runs_df to Run objects for token analysis
+    runs_data = []
+    for _, row in runs_df.iterrows():
+        run = Run(
+            task_id=row['task_id'],
+            task_family=row.get('task_family', row.get('task_source', 'unknown')),
+            run_id=row.get('run_id', f"{row.get('agent', 'unknown')}_{row['task_id']}"),
+            alias=row.get('alias', row.get('agent', 'unknown')),
+            model=row.get('model', row.get('agent', 'unknown')),
+            score_binarized=int(row['score_binarized']),
+            human_minutes=float(row['human_minutes']),
+            score_cont=row.get('score_cont', float(row['score_binarized'])),
+            human_source=row.get('human_source', 'baseline'),
+            task_source=row.get('task_source', 'unknown')
+        )
+        runs_data.append(run)
+    
+    # Find inspect_ai log directories automatically
+    all_token_data = {}
+    benchmarks_dir = config.RESULTS_DIR / "benchmarks"
+    
+    if benchmarks_dir.exists():
+        for dataset_dir in benchmarks_dir.iterdir():
+            if dataset_dir.is_dir():
+                inspect_logs_dir = dataset_dir / "inspect_logs"
+                if inspect_logs_dir.exists():
+                    logger.info(f"Extracting tokens from {inspect_logs_dir}")
+                    dataset_tokens = extract_tokens_from_eval_logs(inspect_logs_dir)
+                    all_token_data.update(dataset_tokens)
+    
+    if not all_token_data:
+        logger.info("No token data found - skipping token analysis plots")
+        return []
+    
+    # Generate token analysis plots
+    create_token_plots(runs_data, all_token_data, token_output_dir)
+    
+    # Return list of generated token plot files
+    token_plot_files = []
+    for plot_file in token_output_dir.glob("*.png"):
+        token_plot_files.append(plot_file)
+    
+    logger.info(f"Generated {len(token_plot_files)} token analysis plots")
+    return token_plot_files
 
 
 def _create_histogram_plot_params(focus_agents: list) -> dict:
@@ -433,3 +620,220 @@ def _plot_task_length_distribution(
     logger.info(f"Saved task length distribution plot to {output_file}")
     
     return output_file 
+
+
+def _perform_bootstrapping(
+    all_runs_file: Path,
+    output_dir: Path,
+    n_bootstraps: int
+) -> Path:
+    """
+    Performs bootstrapping on task results to generate a distribution of P50 horizons.
+    """
+    logger.info(f"Performing {n_bootstraps} bootstrap iterations for CI...")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    bootstrap_file = output_dir / "bootstrap_results.csv"
+
+    if bootstrap_file.exists():
+        logger.info("Bootstrap results already exist, skipping.")
+        return bootstrap_file
+
+    all_runs_df = pd.read_json(all_runs_file, lines=True)
+    
+    # Get unique tasks to resample from
+    unique_tasks = all_runs_df['task_id'].unique()
+    n_tasks = len(unique_tasks)
+    
+    agents = sorted(all_runs_df['agent'].unique())
+    bootstrap_p50s = []
+
+    for i in range(n_bootstraps):
+        if (i + 1) % 50 == 0:
+            logger.info(f"  Bootstrap iteration {i+1}/{n_bootstraps}...")
+            
+        # Resample tasks with replacement
+        resampled_task_ids = np.random.choice(unique_tasks, size=n_tasks, replace=True)
+        
+        # Create a new dataframe with only the resampled tasks
+        resampled_df = pd.DataFrame({'task_id': resampled_task_ids})
+        bootstrap_sample_df = pd.merge(resampled_df, all_runs_df, on='task_id', how='left')
+
+        # Calculate logistic fits for this bootstrap sample
+        p50_results_for_iter = {}
+        for agent in agents:
+            agent_df = bootstrap_sample_df[bootstrap_sample_df['agent'] == agent]
+            
+            if len(agent_df) < 2 or agent_df['score_binarized'].nunique() < 2:
+                p50_results_for_iter[f"{agent}_p50"] = np.nan
+                continue
+
+            try:
+                X = np.log2(agent_df['human_minutes']).values.reshape(-1, 1)
+                y = agent_df['score_binarized']
+                weights = agent_df.get('weight', None)
+
+                model = LogisticRegression(C=1.0, class_weight='balanced')
+                model.fit(X, y, sample_weight=weights)
+
+                coef = model.coef_[0][0]
+                intercept = model.intercept_[0]
+                
+                if coef != 0:
+                    p50_log2 = -intercept / coef
+                    p50 = np.exp2(p50_log2)
+                    p50_results_for_iter[f"{agent}_p50"] = p50
+                else:
+                    p50_results_for_iter[f"{agent}_p50"] = np.nan
+
+            except Exception:
+                p50_results_for_iter[f"{agent}_p50"] = np.nan
+                
+        bootstrap_p50s.append(p50_results_for_iter)
+
+    bootstrap_df = pd.DataFrame(bootstrap_p50s)
+    bootstrap_df.to_csv(bootstrap_file, index=False)
+    logger.info(f"Bootstrap results saved to {bootstrap_file}")
+    
+    return bootstrap_file
+
+
+def _add_bootstrap_confidence_region_for_trendline(
+    ax: plt.Axes,
+    sota_p50s: list,
+    sota_dates: list,
+    confidence_level: float,
+    n_bootstraps: int = 1000
+):
+    """
+    Calculate and plot a bootstrap confidence region for the trendline
+    by resampling the SOTA models with replacement.
+    """
+    logger.info("Adding bootstrap confidence region for trendline...")
+    
+    # Convert to arrays
+    p50s = np.array(sota_p50s)
+    dates = pd.to_datetime(sota_dates)
+    n_models = len(p50s)
+    
+    logger.info(f"Bootstrapping trendline from {n_models} SOTA models")
+    logger.info(f"SOTA p50s: {p50s}")
+    logger.info(f"SOTA dates: {[d.strftime('%Y-%m-%d') for d in dates]}")
+    logger.info(f"Date range: {dates.min()} to {dates.max()}")
+    
+    # Create time points for prediction
+    time_points = pd.date_range(
+        start=dates.min(),
+        end=dates.max(),
+        periods=100,
+    )
+    
+    predictions = np.zeros((n_bootstraps, len(time_points)))
+    slopes = []
+    
+    for i in range(n_bootstraps):
+        # Resample models with replacement
+        indices = np.random.choice(n_models, size=n_models, replace=True)
+        resampled_p50s = p50s[indices]
+        resampled_dates = dates[indices]
+        
+        if i < 5:  # Log first few resamplings
+            logger.info(f"  Bootstrap {i}: indices={indices}, p50s={resampled_p50s}")
+        
+        try:
+            # Fit trendline to resampled data
+            log_y = np.log2(resampled_p50s)
+            X = date2num(resampled_dates).reshape(-1, 1)
+            
+            model = LinearRegression()
+            model.fit(X, log_y)
+            slopes.append(model.coef_[0])
+            
+            # Predict over time range
+            time_x = date2num(time_points).reshape(-1, 1)
+            pred_log = model.predict(time_x)
+            predictions[i, :] = np.exp2(pred_log)
+            
+        except Exception as e:
+            predictions[i, :] = np.nan
+    
+    logger.info(f"Slope range: {np.min(slopes):.6f} to {np.max(slopes):.6f}")
+    logger.info(f"Slope std dev: {np.std(slopes):.6f}")
+    
+    # Calculate confidence bounds
+    low_q = (1 - confidence_level) / 2
+    high_q = 1 - low_q
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        lower_bound = np.nanpercentile(predictions, low_q * 100, axis=0)
+        upper_bound = np.nanpercentile(predictions, high_q * 100, axis=0)
+    
+    # Plot confidence region
+    ax.fill_between(
+        time_points,
+        lower_bound,
+        upper_bound,
+        color="gray",
+        alpha=0.3,
+        zorder=5
+    )
+    
+    logger.info("Trendline confidence band plotting complete")
+
+
+# =====================================================================================
+# METR eval-analysis-public code adapted for our plotter
+# Source: third-party/eval-analysis-public/src/plot/logistic.py
+# =====================================================================================
+
+def fit_trendline(
+    p50s: pd.Series, release_dates: pd.Series, log_scale: bool
+) -> tuple[Any, float]:
+    """Fits an exponential trendline to p50s over time."""
+    valid_data = pd.DataFrame({"p50": p50s, "release_date": release_dates}).dropna()
+    if len(valid_data) < 2:
+        return None, 0
+
+    y = np.log2(valid_data["p50"]) if log_scale else valid_data["p50"]
+    X = date2num(valid_data["release_date"]).reshape(-1, 1)
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    predictions = model.predict(X)
+    score = r2_score(y, predictions)
+    return model, score
+
+
+def plot_trendline(
+    ax: Axes,
+    reg: Any,
+    score: float,
+    line_start_date: str,
+    line_end_date: str,
+    log_scale: bool,
+):
+    """Plots a trendline with its doubling time and R^2 score."""
+    start_num = date2num(pd.to_datetime(line_start_date))
+    end_num = date2num(pd.to_datetime(line_end_date))
+    
+    trend_x = np.linspace(start_num, end_num, 200)
+    trend_y_log = reg.predict(trend_x.reshape(-1, 1))
+    trend_y = np.exp2(trend_y_log) if log_scale else trend_y_log
+    
+    ax.plot(trend_x, trend_y, "--", color="red", zorder=3)
+
+    # Annotation
+    slope = reg.coef_[0]
+    doubling_time_days = (np.log(2) / slope) if slope > 0 else 0
+    doubling_time_months = doubling_time_days / 30.44  # Average days in a month
+    
+    annotation = f"Doubling time: {doubling_time_months:.1f} months\nR²: {score:.2f}"
+    
+    ax.text(
+        0.95, 0.05, annotation,
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment='bottom',
+        horizontalalignment='right'
+    ) 
