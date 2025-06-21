@@ -1,13 +1,19 @@
 """
 Configuration and utilities for running local models with inspect_ai.
 
-This module provides support for running models like GPT-2 locally
-through OpenAI-compatible API servers (vLLM, text-generation-inference, etc).
+This module provides support for:
+1. Running models like GPT-2 locally through OpenAI-compatible API servers (vLLM, etc)
+2. Configuring OpenAI completion models (like davinci-002) as "local" models to work
+   around inspect_ai's lack of native support for the completions API endpoint
 """
 
 import os
 import logging
 from typing import Dict
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +42,13 @@ LOCAL_MODEL_CONFIGS: Dict[str, Dict[str, str]] = {
         "base_url": "http://localhost:8000/v1",
         "api_key": "dummy",
         "model": "gpt2-xl",
+        "provider": "openai"
+    },
+    # OpenAI completion models configured as "local" to work around inspect_ai limitations
+    "openai/davinci-002": {
+        "base_url": "http://localhost:8001/v1",  # Our proxy server
+        "api_key": "dummy",  # Proxy doesn't need real key (it uses OPENAI_API_KEY internally)
+        "model": "davinci-002",
         "provider": "openai"
     }
 }
@@ -94,6 +107,22 @@ def validate_local_server(model_name: str) -> bool:
     """
     if model_name not in LOCAL_MODEL_CONFIGS:
         return True  # Not a local model, assume it's fine
+    
+    # Special case for OpenAI API models configured as "local"
+    if model_name == "openai/davinci-002":
+        # Check if proxy server is running
+        import requests
+        try:
+            response = requests.get("http://localhost:8001/health", timeout=5)
+            if response.status_code == 200:
+                logger.info(f"Davinci-002 proxy server is running for {model_name}")
+                return True
+            else:
+                logger.error(f"Davinci-002 proxy server returned status {response.status_code}")
+                return False
+        except requests.exceptions.RequestException:
+            logger.error("Davinci-002 proxy server not running. Please start it with: uv run python scripts/davinci_proxy_server.py")
+            return False
     
     import requests
     

@@ -50,7 +50,7 @@ class CyBashBench(NL2BashBench):
         Create an inspect_ai Task for CyBashBench evaluation, routing to the
         correct prompt generation based on task type.
         """
-        is_completion_model = any(m in model_name.lower() for m in ['gpt2', 'gpt-2', 'davinci'])
+        is_completion_model = any(m in model_name.lower() for m in ['gpt2', 'gpt-2', 'davinci-002'])
 
         # Determine max_tokens from models.json
         max_tokens = 4096  # Sensible default

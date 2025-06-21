@@ -215,7 +215,7 @@ class NL2BashBench(Bench):
         """Create inspect_ai Task for NL2Bash evaluation."""
         # Check if this is a completion model (like GPT-2) vs a chat model
         is_completion_model = any(model_part in model_name.lower() 
-                                for model_part in ['gpt2', 'gpt-2'])
+                                for model_part in ['gpt2', 'gpt-2', 'davinci-002'])
         
         if is_completion_model:
             return self._create_completion_task(tasks)
