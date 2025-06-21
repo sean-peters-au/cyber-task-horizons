@@ -152,10 +152,12 @@ def _load_models_registry(
             name_to_canonical[full_name] = full_name
             if entry.get("model_name"):
                 name_to_canonical[entry["model_name"]] = full_name
+                # Also map with underscores instead of hyphens for compatibility
+                name_to_canonical[entry["model_name"].replace("-", "_")] = full_name
 
     except Exception as e:
         logger.error(f"Error loading models registry: {e}")
-
+    
     return model_details, name_to_canonical
 
 
@@ -223,7 +225,7 @@ def _process_benchmark_file(
     canonical_name = name_to_canonical.get(model_name_from_file)
 
     if not canonical_name:
-        logger.warning(
+        logger.debug(
             f"Could not resolve model '{model_name_from_file}' in '{result_file.name}' "
             "to a known model in models.json. It will appear with a default name and styling."
         )

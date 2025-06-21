@@ -82,6 +82,15 @@
     },
     {
       "provider": "anthropic",
+      "model_name": "claude-3-5-haiku-20241022",
+      "full_name": "anthropic/claude-3-5-haiku-20241022",
+      "release_date": "2024-10-22",
+      "max_output_tokens": 8192,
+      "description": "Anthropic Claude 3.5 Haiku",
+      "alias": "Claude 3.5 Haiku"
+    },
+    {
+      "provider": "anthropic",
       "model_name": "claude-3-5-sonnet-20240620",
       "full_name": "anthropic/claude-3-5-sonnet-20240620",
       "release_date": "2024-06-20",
@@ -164,15 +173,6 @@
       "max_output_tokens": 8192,
       "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up",
       "alias": "Gemini 2.5 Pro (June 2025)"
-    },
-    {
-      "provider": "anthropic",
-      "model_name": "claude-3.5-haiku-20241022",
-      "full_name": "anthropic/claude-3.5-haiku-20241022",
-      "release_date": "2024-10-22",
-      "max_output_tokens": 8192,
-      "description": "Anthropic Claude 3.5 Haiku",
-      "alias": "Claude 3.5 Haiku"
     }
   ],
   "metadata": {

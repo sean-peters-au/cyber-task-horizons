@@ -98,6 +98,28 @@ def create_horizon_plots(
         logger.warning("No runs to plot after filtering")
         return []
     
+    # Create a mapping of agent (full name) to alias for later use
+    agent_to_alias_map = runs_df[['agent', 'alias']].drop_duplicates().set_index('agent')['alias'].to_dict()
+    logger.info(f"Agent to alias mapping: {agent_to_alias_map}")
+    
+    # Check for any missing aliases and warn
+    unique_agents = runs_df['agent'].unique()
+    missing_alias_agents = [agent for agent in unique_agents if agent not in agent_to_alias_map]
+    if missing_alias_agents:
+        logger.debug(f"Agents without alias mapping: {missing_alias_agents}")
+    
+    # Replace agent names with aliases in runs_df for METR functions
+    # Use a more defensive mapping that ensures we never lose agents
+    runs_df_for_metr = runs_df.copy()
+    def safe_alias_map(agent_name):
+        alias = agent_to_alias_map.get(agent_name)
+        if alias is None or alias == agent_name:
+            # If no alias or alias is same as agent name, use agent name
+            return agent_name
+        return alias
+    
+    runs_df_for_metr['agent'] = runs_df_for_metr['agent'].map(safe_alias_map)
+    
     # Configure METR parameters
     wrangle_params = WrangleParams(
         runs_file=all_runs_file,
@@ -113,7 +135,7 @@ def create_horizon_plots(
     logger.info(f"Running logistic regressions for {len(runs_df)} runs...")
     
     # Drop 'alias' column for METR regression to avoid conflicts
-    runs_df_for_regression = runs_df.drop(columns=['alias'])
+    runs_df_for_regression = runs_df_for_metr.drop(columns=['alias'])
     
     regressions = run_logistic_regressions(
         runs=runs_df_for_regression,
@@ -122,6 +144,9 @@ def create_horizon_plots(
         bootstrap_file=None,
         include_empirical_rates=True
     )
+    
+    # The regressions dataframe now has aliases as agent names
+    # We need to keep track of this for consistency
     
     # Save regression results  
     logistic_fits_file = metr_data_dir / "logistic_fits.csv"
@@ -145,18 +170,41 @@ def create_horizon_plots(
     )
     plot_files = [dist_plot_file]
 
+    # Load release dates first
+    with open(release_dates_file, 'r') as f:
+        release_dates_dict = yaml.safe_load(f)
+    
+    # Add release dates to regressions using alias mapping
+    for i, row in regressions.iterrows():
+        agent_alias = row['agent']
+        # Find the full model name that corresponds to this alias
+        full_name = None
+        for full_model_name, alias in agent_to_alias_map.items():
+            if alias == agent_alias:
+                full_name = full_model_name
+                break
+        
+        if full_name and full_name in release_dates_dict.get('date', {}):
+            regressions.at[i, 'release_date'] = release_dates_dict['date'][full_name]
+        else:
+            logger.warning(f"No release date found for agent {agent_alias} (full name: {full_name})")
+    
     # Convert release_date to proper datetime format
     regressions['release_date'] = pd.to_datetime(regressions['release_date'])
     
-    # Load release dates
-    with open(release_dates_file, 'r') as f:
-        release_dates_dict = yaml.safe_load(f)
+    # Also create a version of release_dates_dict with aliases as keys for METR
+    release_dates_dict_aliases = {'date': {}}
+    if 'date' in release_dates_dict:
+        for agent, date in release_dates_dict['date'].items():
+            alias = agent_to_alias_map.get(agent, agent)
+            release_dates_dict_aliases['date'][alias] = date
     
     # Perform bootstrapping to generate data for confidence intervals
     bootstrap_results_file = _perform_bootstrapping(
         all_runs_file=all_runs_file,
         output_dir=output_dir,
         n_bootstraps=n_bootstraps,
+        agent_to_alias_map=agent_to_alias_map,
     )
 
     # Create plots
@@ -164,11 +212,12 @@ def create_horizon_plots(
         # Create combined plot
         plot_file = _create_single_horizon_plot(
             regressions=regressions,
-            runs_df=runs_df,
-            release_dates_dict=release_dates_dict,
+            runs_df=runs_df_for_metr,  # Use the version with aliases
+            release_dates_dict=release_dates_dict_aliases,  # Use aliased version
             success_rate=success_rate,
             output_dir=output_dir,
             bootstrap_results_file=bootstrap_results_file,
+            agent_to_alias_map=agent_to_alias_map,
         )
         plot_files.append(plot_file)
         logger.info(f"Saved horizon plot to {plot_file}")
@@ -176,20 +225,21 @@ def create_horizon_plots(
         # Create plots for each dataset filter
         if dataset_filter:
             filtered_regressions = regressions[regressions['task_source'] == dataset_filter]
-            filtered_runs_df = runs_df[runs_df['task_source'] == dataset_filter]
+            filtered_runs_df = runs_df_for_metr[runs_df_for_metr['task_source'] == dataset_filter]
             if not filtered_regressions.empty:
-                output_paths.append(
+                plot_files.append(
                     _create_single_horizon_plot(
                         regressions=filtered_regressions,
                         runs_df=filtered_runs_df,
-                        release_dates_dict=release_dates_dict,
+                        release_dates_dict=release_dates_dict_aliases,  # Use aliased version
                         success_rate=success_rate,
                         output_dir=output_dir,
                         dataset_filter=dataset_filter,
                         bootstrap_results_file=bootstrap_results_file,
+                        agent_to_alias_map=agent_to_alias_map,
                     )
                 )
-                logger.info(f"Saved horizon plot to {output_paths[-1]}")
+                logger.info(f"Saved horizon plot to {plot_files[-1]}")
 
     logger.info(f"Generated {len(plot_files)} total plots")
     
@@ -209,14 +259,55 @@ def _create_single_horizon_plot(
     output_dir: Path,
     dataset_filter: Optional[str] = None,
     bootstrap_results_file: Optional[Path] = None,
+    agent_to_alias_map: Optional[Dict[str, str]] = None,
 ) -> Path:
     """Create a single horizon plot."""
-    # Create plot configuration
-    plot_params = _create_plot_params(regressions['agent'].unique())
+    # Determine y-axis limits based on actual data to ensure all models are included
+    p_col = f'p{success_rate}'
+    p50_values = regressions[p_col].dropna()
+    if not p50_values.empty:
+        min_p50 = p50_values.min()
+        max_p50 = p50_values.max()
+        logger.info(f"P50 range: {min_p50:.8f} to {max_p50:.8f}")
+        
+        # Use standard padding for log scale plots
+        # Handle very small values like GPT-2's 6.2e-05 
+        lower_y_lim = min_p50 * 0.1  # One order of magnitude below minimum
+        upper_y_lim = max_p50 * 10   # One order of magnitude above maximum
+        
+        # Ensure reasonable bounds for log scale
+        lower_y_lim = max(1e-6, lower_y_lim)
+        upper_y_lim = min(1000000, upper_y_lim)
+        
+        logger.info(f"Calculated y-axis limits: {lower_y_lim:.8f} to {upper_y_lim:.8f}")
+    else:
+        # Fallback values
+        lower_y_lim = 1e-8
+        upper_y_lim = 1000
+    
+    # Get all agents from regressions - let METR handle which ones to display
+    all_agents = regressions['agent'].unique().tolist()
+    logger.info(f"All agents in regression data: {all_agents}")
+    
+    # Create plot configuration with all agents
+    plot_params = _create_plot_params(all_agents)
+    
+    # Verify all agents in regressions have styling
+    missing_styling = []
+    for agent in regressions['agent'].unique():
+        if agent not in plot_params['agent_styling']:
+            missing_styling.append(agent)
+    
+    if missing_styling:
+        logger.warning(f"Agents missing styling: {missing_styling}")
+    else:
+        logger.info("All agents have styling configured")
     
     # Debug logging
-    logger.info(f"Agents in regressions: {sorted(regressions['agent'].unique())}")
-    logger.info(f"Agents in plot_params['agent_styling']: {sorted(plot_params['agent_styling'].keys())}")
+    logger.debug(f"Agents in regressions: {sorted(regressions['agent'].unique())}")
+    logger.debug(f"Agents in runs_df: {sorted(runs_df['agent'].unique())}")  
+    logger.debug(f"Agents in plot_params['agent_styling']: {sorted(plot_params['agent_styling'].keys())}")
+    logger.debug(f"Agents in plot_params['legend_order']: {plot_params['legend_order']}")
     
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 8))
@@ -226,14 +317,16 @@ def _create_single_horizon_plot(
     if dataset_filter:
         title += f' ({dataset_filter})'
     
+    logger.info(f"Using y-axis limits: {lower_y_lim:.4f} to {upper_y_lim:.1f} minutes")
+    
     # Call METR's plotting function
     plot_horizon_graph(
         plot_params=plot_params,
         all_agent_summaries=regressions,
         runs_df=runs_df,
         release_dates=release_dates_dict,
-        lower_y_lim=0.01,  # ~30 seconds
-        upper_y_lim=240,  # 4 hours in minutes
+        lower_y_lim=lower_y_lim,
+        upper_y_lim=upper_y_lim,
         x_lim_start='2019-01-01',
         x_lim_end='2026-01-01',
         subtitle='',
@@ -245,12 +338,18 @@ def _create_single_horizon_plot(
         fig=fig
     )
 
-    sota_models_for_fit = [
+    # Update SOTA models list to use aliases
+    sota_models_full_names = [
         'google/gemini-2.5-pro-preview-06-05',
         'openai/davinci-002',
         'anthropic/claude-3-5-sonnet-20240620',
         'openai/gpt-3.5-turbo',
     ]
+    
+    if agent_to_alias_map:
+        sota_models_for_fit = [agent_to_alias_map.get(m, m) for m in sota_models_full_names]
+    else:
+        sota_models_for_fit = sota_models_full_names
     
     # Get axis limits from the existing plot for trendline and CI
     x_lim_dates = ax.get_xlim()
@@ -300,36 +399,7 @@ def _create_single_horizon_plot(
                 log_scale=True
             )
 
-    # Manually build the legend to ensure all agents are included and correctly ordered.
-    legend_handles = []
-
-    # Get a map from the agent's full_name to its desired alias for the legend.
-    agent_to_alias = runs_df.drop_duplicates(subset=['agent']).set_index('agent')['alias']
-    
-    # Sort agents by release date to ensure the legend is chronological.
-    sorted_agents_df = regressions[['agent', 'release_date']].drop_duplicates()
-    sorted_agents = sorted_agents_df.sort_values('release_date')['agent'].tolist()
-    
-    for agent in sorted_agents:
-        # Skip any agent that doesn't have styling info (shouldn't happen).
-        if agent not in plot_params['agent_styling']:
-            continue
-            
-        style = plot_params['agent_styling'][agent]
-        label = agent_to_alias.get(agent, agent) # Use alias, fallback to full name.
-        
-        # Create a proxy artist for the legend.
-        handle = plt.Line2D(
-            [0], [0],
-            marker=style.get('marker', 'o'),
-            color=style.get('lab_color', 'blue'),
-            linestyle='None',
-            markersize=10,
-            label=label
-        )
-        legend_handles.append(handle)
-
-    ax.legend(handles=legend_handles, loc='upper right')
+    # Legend is now handled by METR's fixed legend creation logic
 
     # Add title and save
     ax.set_title(title, fontsize=16)
@@ -346,6 +416,9 @@ def _create_plot_params(agents: List[str]) -> Dict:
     Create plot parameters compatible with METR's plotting functions,
     but with expanded styling to support more agents.
     """
+    # Convert to list and ensure it's not empty
+    agents_list = list(agents) if agents is not None else []
+    
     # Base styling from METR's defaults
     plot_params = {
         'scatter_styling': {
@@ -359,7 +432,7 @@ def _create_plot_params(agents: List[str]) -> Dict:
         'agent_styling': {
             'default': {'lab_color': 'blue', 'marker': 'o'}
         },
-        'legend_order': agents,
+        'legend_order': agents_list,
         'ax_label_fontsize': 14,
         'title_fontsize': 16,
         'annotation_fontsize': 12,
@@ -386,8 +459,10 @@ def _create_plot_params(agents: List[str]) -> Dict:
             'lab_color': colors[i % len(colors)],
             'marker': markers[i % len(markers)]
         }
+        logger.debug(f"Agent {agent}: color={colors[i % len(colors)]}, marker={markers[i % len(markers)]}")
         
     return plot_params
+
 
 
 def _generate_individual_histograms(
@@ -404,10 +479,15 @@ def _generate_individual_histograms(
     all_runs_df = pd.read_json(all_runs_file, lines=True)
     agent_summaries_df = pd.read_csv(logistic_fits_file)
     
-    # Ensure alias column exists
-    if 'alias' not in all_runs_df.columns:
-        logger.error("'alias' column not found in all_runs_df")
-        return output_file
+    # Create agent to alias mapping
+    if 'alias' in all_runs_df.columns:
+        agent_to_alias = all_runs_df[['agent', 'alias']].drop_duplicates().set_index('agent')['alias'].to_dict()
+        
+        # Replace agent names with aliases in both dataframes for consistency
+        all_runs_df['agent'] = all_runs_df['agent'].map(lambda x: agent_to_alias.get(x, x))
+        # Note: agent_summaries_df already has aliases as 'agent' from the regression step
+    else:
+        logger.warning("'alias' column not found in all_runs_df, using agent names as-is")
     
     # Sort agents by release date for consistent plot ordering
     if "release_date" in agent_summaries_df.columns:
@@ -625,7 +705,8 @@ def _plot_task_length_distribution(
 def _perform_bootstrapping(
     all_runs_file: Path,
     output_dir: Path,
-    n_bootstraps: int
+    n_bootstraps: int,
+    agent_to_alias_map: Optional[Dict[str, str]] = None
 ) -> Path:
     """
     Performs bootstrapping on task results to generate a distribution of P50 horizons.
@@ -639,6 +720,10 @@ def _perform_bootstrapping(
         return bootstrap_file
 
     all_runs_df = pd.read_json(all_runs_file, lines=True)
+    
+    # Replace agent names with aliases if mapping provided
+    if agent_to_alias_map:
+        all_runs_df['agent'] = all_runs_df['agent'].map(lambda x: agent_to_alias_map.get(x, x))
     
     # Get unique tasks to resample from
     unique_tasks = all_runs_df['task_id'].unique()
