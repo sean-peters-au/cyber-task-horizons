@@ -52,7 +52,7 @@ CYBENCH_IMPUTE_ZERO = [
 ]
 
 # InterCode-CTF Configuration
-INTERCODE_MAX_ITERATIONS = 10
+INTERCODE_MAX_ITERATIONS = 30
 INTERCODE_IMPUTE_ZERO = [
     "openai/gpt2-xl", 
     "openai/davinci-002",
