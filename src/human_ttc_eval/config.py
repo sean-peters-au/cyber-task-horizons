@@ -43,9 +43,6 @@ NL2BASH_BATCH_SIZE = 100
 NL2BASH_SAMPLE_SIZE = 200
 # CyBench Configuration (user-tunable parameters)
 CYBENCH_MAX_ITERATIONS = 30  # Maximum iterations per task (5 is the default in cybench)
-CYBENCH_MAX_INPUT_TOKENS = 6000  # Token limits that users might want to tune
-CYBENCH_MAX_OUTPUT_TOKENS = 2000
-CYBENCH_EVALUATION_TIMEOUT_SECONDS = 7200  # 2 hours - configurable for different setups
 CYBENCH_IMPUTE_ZERO = [
     "openai/gpt2-xl",
     "openai/davinci-002",
@@ -61,7 +58,7 @@ INTERCODE_IMPUTE_ZERO = [
 # NYUCTF Configuration
 NYUCTF_SAMPLE_SIZE = 50
 NYUCTF_RANDOM_SEED = 42
-NYUCTF_MAX_ITERATIONS = 40
+NYUCTF_MAX_ITERATIONS = 50
 NYUCTF_STRATIFY_BY_POINTS = True  # Sample across difficulty levels (easy/medium/hard)
 NYUCTF_IMPUTE_ZERO = [
     "openai/gpt2-xl",
