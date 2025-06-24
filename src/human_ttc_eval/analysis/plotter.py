@@ -270,19 +270,15 @@ def _create_single_horizon_plot(
         max_p50 = p50_values.max()
         logger.info(f"P50 range: {min_p50:.8f} to {max_p50:.8f}")
         
-        # Use standard padding for log scale plots
-        # Handle very small values like GPT-2's 6.2e-05 
-        lower_y_lim = min_p50 * 0.1  # One order of magnitude below minimum
-        upper_y_lim = max_p50 * 10   # One order of magnitude above maximum
-        
-        # Ensure reasonable bounds for log scale
-        lower_y_lim = max(1e-6, lower_y_lim)
-        upper_y_lim = min(1000000, upper_y_lim)
+        # Set fixed y-axis limits as requested: 0 to 4 hours (240 minutes)
+        # Lower limit must include GPT-2's value of 6.2e-05 (0.000062)
+        lower_y_lim = 1e-2   # 0.000001 minutes (0.06 seconds) to include GPT-2
+        upper_y_lim = 240    # 4 hours in minutes
         
         logger.info(f"Calculated y-axis limits: {lower_y_lim:.8f} to {upper_y_lim:.8f}")
     else:
         # Fallback values
-        lower_y_lim = 1e-8
+        lower_y_lim = 1e-2
         upper_y_lim = 1000
     
     # Get all agents from regressions - let METR handle which ones to display
@@ -419,6 +415,30 @@ def _create_plot_params(agents: List[str]) -> Dict:
     # Convert to list and ensure it's not empty
     agents_list = list(agents) if agents is not None else []
     
+    # Sort agents chronologically for legend order
+    chronological_order = [
+        'GPT 2',  # 2019-11-05
+        'GPT 3',  # 2020-07-11
+        'GPT 3.5',  # 2022-03-15
+        'Claude 3.5 Sonnet (June 2024)',  # 2024-06-20
+        'Claude 3.5 Haiku',  # 2024-10-22
+        'Claude 3.5 Sonnet (Oct 2024)',  # 2024-10-22
+        'O3',  # 2025-04-16
+        'O4 Mini',  # 2025-04-16
+        'Gemini 2.5 Pro (June 2025)',  # 2025-06-05
+    ]
+    
+    # Create chronologically sorted legend order
+    sorted_agents = []
+    for agent in chronological_order:
+        if agent in agents_list:
+            sorted_agents.append(agent)
+    
+    # Add any agents not in the predefined order at the end
+    for agent in agents_list:
+        if agent not in sorted_agents:
+            sorted_agents.append(agent)
+    
     # Base styling from METR's defaults
     plot_params = {
         'scatter_styling': {
@@ -432,7 +452,7 @@ def _create_plot_params(agents: List[str]) -> Dict:
         'agent_styling': {
             'default': {'lab_color': 'blue', 'marker': 'o'}
         },
-        'legend_order': agents_list,
+        'legend_order': sorted_agents,
         'ax_label_fontsize': 14,
         'title_fontsize': 16,
         'annotation_fontsize': 12,
@@ -453,8 +473,8 @@ def _create_plot_params(agents: List[str]) -> Dict:
         'D', 'd', 'P', 'X', 'o', 'v', '^', '<', '>', 's'
     ]
     
-    # Assign a unique color and marker to each agent
-    for i, agent in enumerate(agents):
+    # Assign a unique color and marker to each agent (in chronological order)
+    for i, agent in enumerate(sorted_agents):
         plot_params['agent_styling'][agent] = {
             'lab_color': colors[i % len(colors)],
             'marker': markers[i % len(markers)]
@@ -462,7 +482,6 @@ def _create_plot_params(agents: List[str]) -> Dict:
         logger.debug(f"Agent {agent}: color={colors[i % len(colors)]}, marker={markers[i % len(markers)]}")
         
     return plot_params
-
 
 
 def _generate_individual_histograms(
@@ -490,17 +509,34 @@ def _generate_individual_histograms(
         logger.warning("'alias' column not found in all_runs_df, using agent names as-is")
     
     # Sort agents by release date for consistent plot ordering
-    if "release_date" in agent_summaries_df.columns:
-        agent_summaries_df["release_date"] = pd.to_datetime(
-            agent_summaries_df["release_date"]
-        )
-        sorted_agents = agent_summaries_df.sort_values("release_date")
-        focus_agents = sorted_agents["agent"].tolist()
-    else:
-        focus_agents = agent_summaries_df["agent"].unique().tolist()
-        logger.warning(
-            "'release_date' column not found in logistic_fits_file. Plots will not be sorted by date."
-        )
+    # Define the chronological order manually based on known release dates
+    chronological_order = [
+        'GPT 2',  # 2019-11-05
+        'GPT 3',  # 2020-07-11
+        'GPT 3.5',  # 2022-03-15
+        'Claude 3.5 Sonnet (June 2024)',  # 2024-06-20
+        'Claude 3.5 Haiku',  # 2024-10-22
+        'Claude 3.5 Sonnet (Oct 2024)',  # 2024-10-22
+        'O3',  # 2025-04-16
+        'O4 Mini',  # 2025-04-16
+        'Gemini 2.5 Pro (June 2025)',  # 2025-06-05
+    ]
+    
+    # Get available agents
+    available_agents = agent_summaries_df["agent"].unique().tolist()
+    
+    # Order agents chronologically, putting any new agents at the end
+    focus_agents = []
+    for agent in chronological_order:
+        if agent in available_agents:
+            focus_agents.append(agent)
+    
+    # Add any agents not in the predefined order at the end
+    for agent in available_agents:
+        if agent not in focus_agents:
+            focus_agents.append(agent)
+    
+    logger.info(f"Ordered agents chronologically: {focus_agents}")
         
     if not focus_agents:
         logger.warning("No agents found in logistic_fits_file")
