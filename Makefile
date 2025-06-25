@@ -54,11 +54,23 @@ MODELS_3 = \
 	openai/gpt-4-0613 \
 	openai/gpt-4-32k-0613
 
+# Tier 4: Publication models from the blog post
+MODELS_PUBLICATION = \
+	openai/gpt2-xl \
+	openai/davinci-002 \
+	openai/gpt-3.5-turbo \
+	anthropic/claude-3-5-sonnet-20240620 \
+	anthropic/claude-3-5-haiku-20241022 \
+	anthropic/claude-3-5-sonnet-20241022 \
+	openai/o4-mini-2025-04-16 \
+	openai/o3-2025-04-16 \
+	google/gemini-2.5-pro-20250605
+
 # Phony targets
 .PHONY: all help datasets docs clean clean_datasets clean_benchmarks clean_docs test \
         retrieve prepare describe bench retrieve-all prepare-all describe-all \
-        plot third-party repro \
-        start-local-model-server stop-local-model-server
+        plot third-party repro progress run-gpt2xl-local \
+        run-davinci-local start-local-model-servers stop-local-model-servers
 
 # --- Third-Party Repository Setup ---
 third-party:
@@ -101,9 +113,11 @@ help:
 	@echo ""
 	@echo "Benchmarking commands:"
 	@echo "  make bench DATASET=cybench MODEL=openai/gpt-4 - Run single benchmark"
+	@echo "  make progress             - Check progress against publication models"
 	@echo "  make repro TIER=1       - Run all datasets on MODELS_1 (fast)"
 	@echo "  make repro TIER=2       - Run all datasets on MODELS_2 (medium)"
 	@echo "  make repro TIER=3       - Run all datasets on MODELS_3 (full)"
+	@echo "  make repro TIER=publication - Run all datasets on MODELS_PUBLICATION (publication models)"
 	@echo ""
 	@echo "Available datasets: cybench, nl2bash, intercode-ctf, cybashbench, nyuctf"
 	@echo ""
@@ -111,6 +125,13 @@ help:
 	@echo "  TIER=1: gpt2-xl, gpt-3.5-turbo, claude-3.5-haiku, o4-mini"
 	@echo "  TIER=2: davinci-002, classic gpt-4s, sonnet variants, gemini-flash"
 	@echo "  TIER=3: sonnet, frontier models (gemini-pro, opus-4, o3), other gpt-4s"
+	@echo "  TIER=publication: Models listed in the blog post for final results"
+	@echo ""
+	@echo "Local model servers:"
+	@echo "  make start-local-model-servers - Start all local servers in the background"
+	@echo "  make stop-local-model-servers  - Stop all local servers"
+	@echo "  make run-gpt2xl-local          - Run only gpt2-xl server in foreground"
+	@echo "  make run-davinci-local         - Run only davinci proxy in foreground"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make repro TIER=1"
@@ -163,7 +184,12 @@ bench: prepare
 	@echo ">>> Running $(DATASET) benchmark evaluation..."
 	@echo "Model: $(MODEL), Runs: $(NUM_RUNS)"
 	@mkdir -p results/benchmarks/$(DATASET)
-	$(HTE_CLI) benchmark $(DATASET) --model "$(MODEL)" --num-runs $(NUM_RUNS)
+	$(HTE_CLI) benchmark $(DATASET) --model "$(MODEL)" --num-runs $(NUM_RUNS) 
+
+# --- Progress Check Target ---
+progress:
+	@echo ">>> Checking benchmark progress for publication models..."
+	$(PYTHON) scripts/check_progress.py --datasets "$(DATASETS)" --models "$(MODELS_PUBLICATION)"
 
 # --- Plotting Targets ---
 plot:
@@ -172,14 +198,31 @@ plot:
 	@mkdir -p results/plots
 	$(HTE_CLI) plot --success-rate $(SUCCESS_RATE)
 
+# --- Task Review Target ---
+review-cybashbench:
+	@echo ">>> Starting CyBashBench task review tool..."
+	$(PYTHON) scripts/review_cybashbench_tasks.py
+
 # --- Local Model Server Targets ---
-start-local-model-server:
-	@echo ">>> Starting $(MODEL) server with vLLM..."
+start-local-model-servers:
+	@echo ">>> Starting all local model servers in the background..."
+	@mkdir -p logs
+	@echo ">>> Starting gpt2-xl server (logs at logs/gpt2xl-server.log)..."
+	@HF_MODEL=gpt2-xl; \
+	(PYTHONPATH=src: $(PYTHON) -m vllm.entrypoints.openai.api_server \
+		--model $$HF_MODEL \
+		--host 0.0.0.0 --port 8000 --max-model-len 1024 \
+		--chat-template "{% for message in messages %}{% if message['role'] == 'system' %}{{ message['content'] + '\n\n' }}{% elif message['role'] == 'user' %}{{ message['content'] }}{% endif %}{% endfor %}" > logs/gpt2xl-server.log 2>&1 &)
+	@echo ">>> Starting davinci-002 proxy server (logs at logs/davinci-proxy.log)..."
+	@($(PYTHON) scripts/davinci_proxy_server.py > logs/davinci-proxy.log 2>&1 &)
+	@echo ">>> Servers are starting. Use 'make stop-local-model-servers' to stop them."
+
+run-gpt2xl-local:
+	@echo ">>> Starting gpt2-xl server with vLLM..."
 	@echo ">>> Server will be available at http://localhost:8000"
-	@echo ">>> Use MODEL=$(MODEL) when running benchmarks"
+	@echo ">>> Use MODEL=openai/gpt2-xl when running benchmarks"
 	@echo ">>> Press Ctrl+C to stop the server"
-	@# Convert openai/gpt-2 -> gpt2, etc.
-	@HF_MODEL=$$(echo "$(MODEL)" | sed 's|openai/gpt-2|gpt2|' | sed 's|openai/gpt-2-|gpt2-|' | sed 's|openai/||'); \
+	@HF_MODEL=gpt2-xl; \
 	echo ">>> Using HuggingFace model: $$HF_MODEL"; \
 	PYTHONPATH=src: $(PYTHON) -m vllm.entrypoints.openai.api_server \
 		--model $$HF_MODEL \
@@ -188,9 +231,17 @@ start-local-model-server:
 		--max-model-len 1024 \
 		--chat-template "{% for message in messages %}{% if message['role'] == 'system' %}{{ message['content'] + '\n\n' }}{% elif message['role'] == 'user' %}{{ message['content'] }}{% endif %}{% endfor %}"
 
-stop-local-model-server:
-	@echo ">>> Stopping vLLM server..."
+run-davinci-local:
+	@echo ">>> Starting davinci-002 proxy server..."
+	@echo ">>> Server will be available at http://localhost:8001"
+	@echo ">>> Use MODEL=openai/davinci-002 when running benchmarks"
+	@echo ">>> Press Ctrl+C to stop the server"
+	$(PYTHON) scripts/davinci_proxy_server.py
+
+stop-local-model-servers:
+	@echo ">>> Stopping all local model servers..."
 	@pkill -f "vllm.entrypoints.openai.api_server" || echo "No vLLM server running"
+	@pkill -f "davinci_proxy_server.py" || echo "No davinci-002 proxy server running"
 
 # --- Reproduction Pipeline ---
 repro: describe-all
@@ -198,7 +249,8 @@ repro: describe-all
 	@if [ "$(TIER)" = "1" ]; then models="$(MODELS_1)"; \
 	elif [ "$(TIER)" = "2" ]; then models="$(MODELS_2)"; \
 	elif [ "$(TIER)" = "3" ]; then models="$(MODELS_3)"; \
-	else echo "Invalid TIER: $(TIER). Use 1, 2, or 3."; exit 1; fi; \
+	elif [ "$(TIER)" = "publication" ]; then models="$(MODELS_PUBLICATION)"; \
+	else echo "Invalid TIER: $(TIER). Use 1, 2, 3, or publication."; exit 1; fi; \
 	for model in $$models; do \
 		for dataset in $(DATASETS); do \
 			echo ">>> Running $$model on $$dataset..."; \
