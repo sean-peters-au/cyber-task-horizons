@@ -8,6 +8,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+import datetime
 import random
 import argparse
 from collections import Counter
@@ -19,9 +20,10 @@ from rich.layout import Layout
 from rich.prompt import Prompt
 
 class CyBashBenchReviewer:
-    def __init__(self, input_file: str, rereview: bool = False):
+    def __init__(self, input_file: str, rereview=False, time_range: str = None):
         self.input_file = Path(input_file)
         self.rereview = rereview
+        self.time_range = time_range
         self.tasks = self._load_tasks()
         self.review_results = []
         self.time_ranges = self._categorize_by_time()
@@ -85,6 +87,19 @@ class CyBashBenchReviewer:
         
         return ranges
     
+    def _get_time_category(self, time_mins: float) -> str:
+        """Get the time category for a given time in minutes."""
+        if time_mins < 0.05:
+            return 'very_fast'
+        elif time_mins < 0.1:
+            return 'fast'
+        elif time_mins < 0.2:
+            return 'medium'
+        elif time_mins < 0.4:
+            return 'slow'
+        else:
+            return 'very_slow'
+    
     def _create_distribution_plot(self) -> str:
         """Create a simple ASCII histogram of time distribution."""
         # Collect all times in seconds
@@ -120,16 +135,7 @@ class CyBashBenchReviewer:
     
     def _get_time_range_examples(self, current_time_mins: float) -> List[Dict[str, Any]]:
         """Get examples from the same time range."""
-        if current_time_mins < 0.05:
-            range_key = 'very_fast'
-        elif current_time_mins < 0.1:
-            range_key = 'fast'
-        elif current_time_mins < 0.2:
-            range_key = 'medium'
-        elif current_time_mins < 0.4:
-            range_key = 'slow'
-        else:
-            range_key = 'very_slow'
+        range_key = self._get_time_category(current_time_mins)
         
         examples = self.time_ranges[range_key]
         if len(examples) < 2:
@@ -192,7 +198,8 @@ class CyBashBenchReviewer:
             
             # Format task based on type
             if task_type == 'nl2bash':
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]→ Convert to bash command[/]"
+                expected = metadata.get('bash_command', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]→ Convert to bash command[/]\n[dim]Expected:[/] [green]{expected}[/]"
             elif task_type in ['nl2bash-prefixed', 'nl2bash-prefix']:
                 prefix = metadata.get('command_prefix', '')
                 completion = metadata.get('expected_completion', '')
@@ -200,22 +207,27 @@ class CyBashBenchReviewer:
                 task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[bold white]Complete this:[/] [cyan]{prefix}[/cyan][yellow]___|[/yellow]\n[dim]Full answer:[/] [green]{full_command}[/]"
             elif task_type == 'nl2bash-blanks':
                 template = metadata.get('template', '')
+                expected_fill = metadata.get('expected_fill', '')
                 blank_template = template.replace('___', '[red]___[/red]')
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Fill:[/] {blank_template}"
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Fill:[/] {blank_template}\n[dim]Answer:[/] [green]{expected_fill}[/]"
             elif task_type == 'contextual':
                 context = metadata.get('context', '')
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Context:[/] {context}\n[bold]{nl}[/]"
+                expected = metadata.get('bash_command', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Context:[/] {context}\n[bold]{nl}[/]\n[dim]Expected:[/] [green]{expected}[/]"
             elif task_type == 'multi-step':
                 prev_cmd = metadata.get('previous_command', '')
                 prev_out = metadata.get('previous_output', '')
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Previous:[/] [cyan]{prev_cmd}[/] → [yellow]{prev_out}[/]\n[bold]{nl}[/]"
+                expected = metadata.get('bash_command', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Previous:[/] [cyan]{prev_cmd}[/] → [yellow]{prev_out}[/]\n[bold]{nl}[/]\n[dim]Expected:[/] [green]{expected}[/]"
             elif task_type == 'mcq':
                 choices = metadata.get('choices', [])
+                correct_answer = metadata.get('correct_answer', '')
                 choices_text = '\n'.join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices)])
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n\n{choices_text}"
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n\n{choices_text}\n\n[dim]Answer:[/] [green]{correct_answer}[/]"
             elif task_type == 'single-char':
                 prefix = metadata.get('command_prefix', '')
-                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Complete:[/] [cyan]{prefix}[/]"
+                expected_completion = metadata.get('expected_completion', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Complete:[/] [cyan]{prefix}[/]\n[dim]Answer:[/] [green]{expected_completion}[/]"
             else:
                 task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]"
             
@@ -276,7 +288,8 @@ class CyBashBenchReviewer:
             
             # Format task based on type (full version)
             if task_type == 'nl2bash':
-                task_content += f"[bold white]Task:[/] {nl}\n\n[dim]→ Convert to bash command[/]"
+                expected = metadata.get('bash_command', '')
+                task_content += f"[bold white]Task:[/] {nl}\n\n[dim]→ Convert to bash command[/]\n[bold white]Expected:[/] [green]{expected}[/]"
             elif task_type in ['nl2bash-prefixed', 'nl2bash-prefix']:
                 prefix = metadata.get('command_prefix', '')
                 completion = metadata.get('expected_completion', '')
@@ -284,22 +297,27 @@ class CyBashBenchReviewer:
                 task_content += f"[bold white]Task:[/] {nl}\n[bold white]Complete this:[/] [cyan]{prefix}[/cyan][yellow]___|[/yellow]\n[bold white]Full answer:[/] [green]{full_command}[/]"
             elif task_type == 'nl2bash-blanks':
                 template = metadata.get('template', '')
+                expected_fill = metadata.get('expected_fill', '')
                 blank_template = template.replace('___', '[red]___[/red]')
-                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Fill blank:[/] {blank_template}"
+                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Fill blank:[/] {blank_template}\n[bold white]Answer:[/] [green]{expected_fill}[/]"
             elif task_type == 'contextual':
                 context = metadata.get('context', '')
-                task_content += f"[yellow]Context:[/] {context}\n[bold white]Task:[/] {nl}"
+                expected = metadata.get('bash_command', '')
+                task_content += f"[yellow]Context:[/] {context}\n[bold white]Task:[/] {nl}\n[bold white]Expected:[/] [green]{expected}[/]"
             elif task_type == 'multi-step':
                 prev_cmd = metadata.get('previous_command', '')
                 prev_out = metadata.get('previous_output', '')
-                task_content += f"[bold white]Previous:[/] [cyan]{prev_cmd}[/]\n[bold white]Output:[/] [yellow]{prev_out}[/]\n[bold white]Next:[/] {nl}"
+                expected = metadata.get('bash_command', '')
+                task_content += f"[bold white]Previous:[/] [cyan]{prev_cmd}[/]\n[bold white]Output:[/] [yellow]{prev_out}[/]\n[bold white]Next:[/] {nl}\n[bold white]Expected:[/] [green]{expected}[/]"
             elif task_type == 'mcq':
                 choices = metadata.get('choices', [])
+                correct_answer = metadata.get('correct_answer', '')
                 choices_text = '\n'.join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices)])
-                task_content += f"[bold white]Question:[/] {nl}\n\n{choices_text}\n\n[bold white]Answer:[/]"
+                task_content += f"[bold white]Question:[/] {nl}\n\n{choices_text}\n\n[bold white]Answer:[/] [green]{correct_answer}[/]"
             elif task_type == 'single-char':
                 prefix = metadata.get('command_prefix', '')
-                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Complete:[/] [cyan]{prefix}[/]"
+                expected_completion = metadata.get('expected_completion', '')
+                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Complete:[/] [cyan]{prefix}[/]\n[bold white]Answer:[/] [green]{expected_completion}[/]"
             
             # Expected answer is already included in task-specific formatting above
             
@@ -395,18 +413,43 @@ class CyBashBenchReviewer:
         # Filter tasks that need review
         tasks_to_review = []
         skipped_count = 0
+        time_filtered_count = 0
         
         for task in self.tasks:
             timing_source = task.get('dataset_task_metadata', {}).get('timing_source', '')
+            time_mins = task.get('human_minutes', 0)
+            time_category = self._get_time_category(time_mins)
+            
+            # Skip if not in rereview mode and already reviewed
             if not self.rereview and timing_source in ['human_reviewed', 'human_calibration']:
                 skipped_count += 1
-            else:
-                tasks_to_review.append(task)
+                continue
+                
+            # If time range specified, filter by time category
+            if self.time_range and time_category != self.time_range:
+                time_filtered_count += 1
+                continue
+                
+            tasks_to_review.append(task)
         
+        # Show filtering status messages
         if skipped_count > 0 and not self.rereview:
             self.console.print(f"\n[cyan]ℹ Skipping[/] [yellow]{skipped_count}[/] tasks that are already human-reviewed or human-calibrated")
         elif self.rereview:
-            self.console.print(f"\n[yellow]ℹ Re-review mode:[/] Including all tasks (even previously reviewed)")
+            if self.time_range:
+                time_range_desc = {
+                    'very_fast': '< 3s',
+                    'fast': '3-6s', 
+                    'medium': '6-12s',
+                    'slow': '12-24s',
+                    'very_slow': '> 24s'
+                }[self.time_range]
+                self.console.print(f"\n[yellow]ℹ Re-review mode:[/] Including {self.time_range} tasks ({time_range_desc}) only")
+            else:
+                self.console.print(f"\n[yellow]ℹ Re-review mode:[/] Including all tasks (even previously reviewed)")
+                
+        if time_filtered_count > 0:
+            self.console.print(f"[cyan]ℹ Time filtered:[/] [yellow]{time_filtered_count}[/] tasks outside selected time range")
         
         if not tasks_to_review:
             self.console.print("\n[green]✓ All tasks have been reviewed![/] No tasks need review.")
@@ -497,8 +540,9 @@ def main():
     parser.add_argument("input_file", nargs="?", 
                        default="/Users/speters/git/personal/human-ttc-eval/data/keep/cybashbench/cybashbench_tasks.jsonl",
                        help="Input JSONL file with tasks")
-    parser.add_argument("--rereview", action="store_true",
-                       help="Include previously reviewed tasks for re-review")
+    parser.add_argument("--rereview", nargs="?", const=True, 
+                       choices=['very_fast', 'fast', 'medium', 'slow', 'very_slow'],
+                       help="Include previously reviewed tasks for re-review. Optionally specify time range: very_fast (<3s), fast (3-6s), medium (6-12s), slow (12-24s), very_slow (>24s)")
     
     args = parser.parse_args()
     
@@ -506,7 +550,11 @@ def main():
         print(f"Error: Input file '{args.input_file}' not found")
         sys.exit(1)
     
-    reviewer = CyBashBenchReviewer(args.input_file, args.rereview)
+    # Handle rereview argument - can be True (boolean) or a time range string
+    rereview_enabled = bool(args.rereview)
+    time_range = args.rereview if isinstance(args.rereview, str) else None
+    
+    reviewer = CyBashBenchReviewer(args.input_file, rereview_enabled, time_range)
     
     try:
         reviewer.review_tasks()
