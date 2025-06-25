@@ -30,7 +30,7 @@ from inspect_ai.scorer import includes
 from inspect_ai.tool import bash, python
 from inspect_ai.tool import tool_with
 from inspect_ai.solver import Solver
-from inspect_ai.agent import react
+from inspect_ai.agent import react, human_cli
 
 logger = logging.getLogger(__name__)
 
@@ -112,30 +112,35 @@ class CybenchBench(Bench):
         """
         start_time = datetime.now(timezone.utc)
         model_alias = model_alias or model_name
+        is_human_eval = model_name.lower() == "human"
 
-        # Check for zero-imputation first
-        if model_name in config.CYBENCH_IMPUTE_ZERO:
-            effective_task_ids = task_ids or self.list_available_tasks()
-            return self._create_zero_imputed_result(
-                model_name=model_name,
-                model_alias=model_alias,
-                task_ids=effective_task_ids,
-                start_time=start_time,
-                reason=f"Model '{model_name}' cannot run tool-requiring CyBench tasks"
-            )
+        # Set is_local for the final metadata, default to False for human eval
+        is_local = False
 
-        # Validate model format
-        if "/" not in model_name:
-            error_msg = f"Model name must be in provider/model format, got: {model_name}"
-            logger.error(error_msg)
-            return self._create_error_result(model_name, model_alias, start_time, error_msg)
-        
-        # Check if this is a local model
-        is_local = model_name in LOCAL_MODEL_CONFIGS
-        if is_local and not validate_local_server(model_name):
-            error_msg = f"Local server not running for {model_name}. Run 'make start-local-model-server MODEL={model_name}' first."
-            logger.error(error_msg)
-            return self._create_error_result(model_name, model_alias, start_time, error_msg)
+        if not is_human_eval:
+            # Check for zero-imputation first
+            if model_name in config.CYBENCH_IMPUTE_ZERO:
+                effective_task_ids = task_ids or self.list_available_tasks()
+                return self._create_zero_imputed_result(
+                    model_name=model_name,
+                    model_alias=model_alias,
+                    task_ids=effective_task_ids,
+                    start_time=start_time,
+                    reason=f"Model '{model_name}' cannot run tool-requiring CyBench tasks"
+                )
+
+            # Validate model format
+            if "/" not in model_name:
+                error_msg = f"Model name must be in provider/model format, got: {model_name}"
+                logger.error(error_msg)
+                return self._create_error_result(model_name, model_alias, start_time, error_msg)
+            
+            # Check if this is a local model
+            is_local = model_name in LOCAL_MODEL_CONFIGS
+            if is_local and not validate_local_server(model_name):
+                error_msg = f"Local server not running for {model_name}. Run 'make start-local-model-server MODEL={model_name}' first."
+                logger.error(error_msg)
+                return self._create_error_result(model_name, model_alias, start_time, error_msg)
         
         # Load tasks
         tasks = self._load_tasks(task_ids)
@@ -152,21 +157,33 @@ class CybenchBench(Bench):
             
             # Prepare eval parameters
             eval_params = {
-                "model": model_name,
                 "log_dir": str(self.output_dir / "inspect_logs"),
                 "message_limit": self.max_messages,
             }
             
-            # Add base URL for local models
-            if is_local:
-                local_config = LOCAL_MODEL_CONFIGS[model_name]
-                eval_params["model_base_url"] = local_config["base_url"]
+            if is_human_eval:
+                logger.info("Using human_cli solver for manual evaluation.")
+                # A general regex that should match most flag formats
+                flag_regex = r"(flag|csaw|picoctf)\{[^}]+\}"
+                eval_params["solver"] = human_cli(
+                    intermediate_scoring=True,
+                    answer=flag_regex
+                )
+            else:
+                eval_params["model"] = model_name
+                # Add base URL for local models
+                if is_local:
+                    local_config = LOCAL_MODEL_CONFIGS[model_name]
+                    eval_params["model_base_url"] = local_config["base_url"]
+            
+            max_connections = 1 if is_human_eval else 5
             
             # Run evaluation
             eval_result = inspect_eval(
                 inspect_task, 
                 retry_on_error=3,  # Retry failed samples up to 3 times
                 fail_on_error=0.1,  # Tolerate up to 10% sample failures
+                max_connections=max_connections,
                 **eval_params
             )
             
