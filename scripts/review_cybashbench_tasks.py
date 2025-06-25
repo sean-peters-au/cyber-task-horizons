@@ -1,43 +1,32 @@
 #!/usr/bin/env python3
 """
 Interactive review tool for CyBashBench tasks.
-Allows viewing tasks as they would be presented, with time estimates,
-and updating/deleting tasks.
+Modern CLI interface for reviewing and updating task time estimates.
 """
 
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
-import datetime
+from typing import Dict, Any, List, Optional
 import random
+import argparse
+from collections import Counter
 
-# ANSI color codes
-class Colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    WHITE = '\033[97m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
-    
-    @staticmethod
-    def colorize(text: str, color: str) -> str:
-        return f"{color}{text}{Colors.END}"
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.layout import Layout
+from rich.prompt import Prompt
 
 class CyBashBenchReviewer:
-    def __init__(self, input_file: str, output_file: str):
+    def __init__(self, input_file: str, rereview: bool = False):
         self.input_file = Path(input_file)
-        self.output_file = Path(output_file)
+        self.rereview = rereview
         self.tasks = self._load_tasks()
         self.review_results = []
         self.time_ranges = self._categorize_by_time()
-        
+        self.console = Console()
+            
     def _load_tasks(self) -> List[Dict[str, Any]]:
         """Load tasks from JSONL file."""
         tasks = []
@@ -59,6 +48,7 @@ class CyBashBenchReviewer:
         
         for task in self.tasks:
             time_mins = task.get('human_minutes', 0)
+            metadata = task.get('dataset_task_metadata', {})
             
             if time_mins < 0.05:
                 range_key = 'very_fast'
@@ -71,53 +61,87 @@ class CyBashBenchReviewer:
             else:
                 range_key = 'very_slow'
             
+            # Get target/expected answer
+            task_type = metadata.get('task_type', 'nl2bash')
+            if task_type == 'nl2bash-blanks':
+                target = metadata.get('expected_fill', '')
+            elif task_type == 'nl2bash-prefixed':
+                target = metadata.get('expected_completion', '')
+            elif task_type == 'mcq':
+                target = metadata.get('correct_answer', '')
+            elif task_type == 'single-char':
+                target = metadata.get('expected_completion', '')
+            else:
+                target = metadata.get('bash_command', '')
+            
             ranges[range_key].append({
-                'desc': task.get('dataset_task_metadata', {}).get('nl_description', ''),
+                'desc': metadata.get('nl_description', ''),
+                'target': target,
                 'time_mins': time_mins,
                 'time_secs': time_mins * 60,
-                'type': task.get('dataset_task_metadata', {}).get('task_type', ''),
-                'source': task.get('dataset_task_metadata', {}).get('timing_source', '')
+                'type': task_type,
+                'source': metadata.get('timing_source', '')
             })
         
         return ranges
     
-    def _get_time_range_examples(self, current_time_mins: float) -> str:
+    def _create_distribution_plot(self) -> str:
+        """Create a simple ASCII histogram of time distribution."""
+        # Collect all times in seconds
+        times = [task.get('human_minutes', 0) * 60 for task in self.tasks]
+        
+        # Create buckets
+        buckets = [0, 1, 2, 3, 5, 10, 15, 20, 30, 60]
+        bucket_counts = [0] * (len(buckets) - 1)
+        bucket_labels = []
+        
+        for i in range(len(buckets) - 1):
+            start, end = buckets[i], buckets[i + 1]
+            count = sum(1 for t in times if start <= t < end)
+            bucket_counts[i] = count
+            bucket_labels.append(f"{start}-{end}s")
+        
+        # Handle overflow
+        overflow = sum(1 for t in times if t >= buckets[-1])
+        if overflow > 0:
+            bucket_counts.append(overflow)
+            bucket_labels.append(f"{buckets[-1]}s+")
+        
+        # Create ASCII plot
+        max_count = max(bucket_counts) if bucket_counts else 1
+        plot_lines = []
+        
+        for label, count in zip(bucket_labels, bucket_counts):
+            bar_length = int((count / max_count) * 30) if max_count > 0 else 0
+            bar = '█' * bar_length
+            plot_lines.append(f"{label:>6} │{bar:<30} {count:>3}")
+        
+        return '\n'.join(plot_lines)
+    
+    def _get_time_range_examples(self, current_time_mins: float) -> List[Dict[str, Any]]:
         """Get examples from the same time range."""
-        # Determine range
         if current_time_mins < 0.05:
             range_key = 'very_fast'
-            range_desc = "< 3 seconds"
         elif current_time_mins < 0.1:
             range_key = 'fast'
-            range_desc = "3-6 seconds"
         elif current_time_mins < 0.2:
             range_key = 'medium'
-            range_desc = "6-12 seconds"
         elif current_time_mins < 0.4:
             range_key = 'slow'
-            range_desc = "12-24 seconds"
         else:
             range_key = 'very_slow'
-            range_desc = "> 24 seconds"
         
         examples = self.time_ranges[range_key]
         if len(examples) < 2:
-            return f"Similar timing range ({range_desc}): No other examples available\n"
+            return []
         
-        # Get 3 random examples, excluding very long descriptions
-        suitable_examples = [ex for ex in examples if len(ex['desc']) < 80]
+        # Get 3 random examples, prioritizing shorter descriptions
+        suitable_examples = [ex for ex in examples if len(ex['desc']) < 100]
         selected = random.sample(suitable_examples, min(3, len(suitable_examples)))
-        
-        example_strings = []
-        for ex in selected:
-            desc = ex['desc'][:50] + "..." if len(ex['desc']) > 50 else ex['desc']
-            example_strings.append(f"[{ex['time_secs']:.1f}s] {desc}")
-        
-        examples_text = " • ".join(example_strings)
-        return f"Similar timing range ({Colors.colorize(range_desc, Colors.CYAN)}): {examples_text}\n"
+        return selected
     
-    def _format_task_prompt(self, task: Dict[str, Any], task_num: int, total_tasks: int) -> str:
-        """Format task as it would appear in the benchmark."""
+    def _format_task_rich(self, task: Dict[str, Any], task_num: int, total_tasks: int, original_pos: int, total_original: int) -> None:
+        """Format task using Rich with responsive layout based on terminal height."""
         metadata = task.get('dataset_task_metadata', {})
         task_type = metadata.get('task_type', 'nl2bash')
         nl = metadata.get('nl_description', '')
@@ -125,80 +149,218 @@ class CyBashBenchReviewer:
         time_secs = time_mins * 60
         timing_source = metadata.get('timing_source', 'unknown')
         
-        # Header with progress
-        header = f"\n{Colors.colorize('=' * 80, Colors.BLUE)}\n"
-        header += f"{Colors.colorize('TASK', Colors.BOLD)} {Colors.colorize(f'{task_num}/{total_tasks}', Colors.MAGENTA)} "
-        header += f"| {Colors.colorize(task['task_id'], Colors.CYAN)}\n"
-        header += f"{Colors.colorize('=' * 80, Colors.BLUE)}\n"
+        # Get terminal height and determine layout
+        terminal_height = self.console.size.height
         
-        # Task info
-        info = f"Type: {Colors.colorize(task_type.upper(), Colors.YELLOW)} | "
-        info += f"Category: {Colors.colorize(metadata.get('security_category', 'N/A'), Colors.YELLOW)} | "
-        info += f"Source: {Colors.colorize(timing_source, Colors.YELLOW)}\n"
-        info += f"Current estimate: {Colors.colorize(f'{time_secs:.1f} seconds', Colors.GREEN)} "
-        info += f"({Colors.colorize(f'{time_mins:.4f} minutes', Colors.GREEN)})\n\n"
-        
-        # Similar timing examples
-        examples = self._get_time_range_examples(time_mins)
-        examples_section = f"{Colors.colorize('Similar timing examples:', Colors.UNDERLINE)}\n{examples}\n"
-        
-        # Task content
-        content_header = f"{Colors.colorize('TASK CONTENT:', Colors.BOLD + Colors.WHITE)}\n"
-        content_header += f"{Colors.colorize('-' * 40, Colors.WHITE)}\n"
-        
-        # Format based on task type
-        task_content = ""
-        if task_type == 'nl2bash':
-            task_content = f"Task: {nl}\n\n[Expected to convert this to a bash command]"
+        if terminal_height < 15:
+            # Ultra compact for very small terminals
+            header = f"[bold blue]TASK {task_num}/{total_tasks}[/] [cyan]{task['task_id'].split('/')[-1]}[/] [green]{time_secs:.1f}s[/]"
+            self.console.print(f"\n{header}")
+            self.console.print(f"[dim]ID:[/] [cyan]{task['task_id']}[/]")
+            self.console.print(f"[bold]{nl}[/]")
             
-        elif task_type == 'nl2bash-prefixed':
-            prefix = metadata.get('command_prefix', '')
-            task_content = f"{nl}\nComplete the command: `{Colors.colorize(prefix, Colors.CYAN)}`"
+            # Show task-specific info
+            if task_type == 'nl2bash-blanks':
+                expected = metadata.get('expected_fill', '')
+                self.console.print(f"[dim]Fill:[/] [green]{expected}[/]")
+            elif task_type in ['nl2bash-prefixed', 'nl2bash-prefix']:
+                prefix = metadata.get('command_prefix', '')
+                completion = metadata.get('expected_completion', '')
+                self.console.print(f"[dim]Complete:[/] [cyan]{prefix}[/cyan][yellow]___[/yellow]")
+                self.console.print(f"[dim]Answer:[/] [green]{prefix}{completion}[/]")
+            elif task_type == 'mcq':
+                expected = metadata.get('correct_answer', '')
+                self.console.print(f"[dim]Answer:[/] [green]{expected}[/]")
+            elif task_type == 'single-char':
+                expected = metadata.get('expected_completion', '')
+                self.console.print(f"[dim]Complete:[/] [green]{expected}[/]")
+            else:
+                expected = metadata.get('bash_command', '')
+                self.console.print(f"[dim]Expected:[/] [green]{expected}[/]")
+            self.console.print("[green]ENTER[/]=Accept [red]D[/]=Delete [yellow]Number[/]=Update [magenta]Q[/]=Quit")
             
-        elif task_type == 'nl2bash-blanks':
-            template = metadata.get('template', '')
-            blank_template = template.replace('___', Colors.colorize('___', Colors.RED))
-            task_content = f"{nl}\nFill in the blank: `{blank_template}`"
+        elif terminal_height < 25:
+            # Medium layout with some examples
+            layout = Layout()
+            layout.split_row(
+                Layout(name="task", ratio=3),
+                Layout(name="examples", ratio=1)
+            )
             
-        elif task_type == 'contextual':
-            context = metadata.get('context', '')
-            task_content = f"Context: {Colors.colorize(context, Colors.YELLOW)}\nTask: {nl}"
+            # Task content
+            header_text = f"[bold blue]TASK {task_num}/{total_tasks}[/] [cyan]{task['task_id']}[/] [yellow]{task_type.upper()}[/] [green]{time_secs:.1f}s[/]"
             
-        elif task_type == 'multi-step':
-            prev_cmd = metadata.get('previous_command', '')
-            prev_out = metadata.get('previous_output', '')
-            task_content = f"Previous command: `{Colors.colorize(prev_cmd, Colors.CYAN)}`\n"
-            task_content += f"Output: `{Colors.colorize(prev_out, Colors.YELLOW)}`\n"
-            task_content += f"Next task: {nl}"
+            # Format task based on type
+            if task_type == 'nl2bash':
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]→ Convert to bash command[/]"
+            elif task_type in ['nl2bash-prefixed', 'nl2bash-prefix']:
+                prefix = metadata.get('command_prefix', '')
+                completion = metadata.get('expected_completion', '')
+                full_command = f"{prefix}{completion}"
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[bold white]Complete this:[/] [cyan]{prefix}[/cyan][yellow]___|[/yellow]\n[dim]Full answer:[/] [green]{full_command}[/]"
+            elif task_type == 'nl2bash-blanks':
+                template = metadata.get('template', '')
+                blank_template = template.replace('___', '[red]___[/red]')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Fill:[/] {blank_template}"
+            elif task_type == 'contextual':
+                context = metadata.get('context', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Context:[/] {context}\n[bold]{nl}[/]"
+            elif task_type == 'multi-step':
+                prev_cmd = metadata.get('previous_command', '')
+                prev_out = metadata.get('previous_output', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[dim]Previous:[/] [cyan]{prev_cmd}[/] → [yellow]{prev_out}[/]\n[bold]{nl}[/]"
+            elif task_type == 'mcq':
+                choices = metadata.get('choices', [])
+                choices_text = '\n'.join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices)])
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n\n{choices_text}"
+            elif task_type == 'single-char':
+                prefix = metadata.get('command_prefix', '')
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]\n[dim]Complete:[/] [cyan]{prefix}[/]"
+            else:
+                task_content = f"{header_text}\n\n[bold cyan]ID:[/] {task['task_id']}\n[bold]{nl}[/]"
             
-        elif task_type == 'mcq':
-            choices = metadata.get('choices', [])
-            choices_text = '\n'.join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices)])
-            task_content = f"{nl}\n\n{choices_text}\n\nAnswer:"
+            # Expected answer is already included in task-specific formatting above
             
-        elif task_type == 'single-char':
-            prefix = metadata.get('command_prefix', '')
-            task_content = f"{nl}\nComplete: `{Colors.colorize(prefix, Colors.CYAN)}`"
-        
-        # Expected answer
-        answer_section = f"\n{Colors.colorize('-' * 40, Colors.WHITE)}\n"
-        answer_section += f"{Colors.colorize('EXPECTED ANSWER:', Colors.BOLD + Colors.WHITE)}\n"
-        
-        if task_type == 'nl2bash-blanks':
-            answer_section += f"Fill: {Colors.colorize(metadata.get('expected_fill', ''), Colors.GREEN)}"
-        elif task_type == 'nl2bash-prefixed':
-            answer_section += f"Completion: {Colors.colorize(metadata.get('expected_completion', ''), Colors.GREEN)}"
-        elif task_type == 'mcq':
-            answer_section += f"Correct: {Colors.colorize(metadata.get('correct_answer', ''), Colors.GREEN)}"
-        elif task_type == 'single-char':
-            answer_section += f"Completion: {Colors.colorize(metadata.get('expected_completion', ''), Colors.GREEN)}"
+            layout["task"].update(Panel(task_content, style="white"))
+            
+            # Examples
+            examples = self._get_time_range_examples(time_mins)
+            if examples:
+                if time_mins < 0.05:
+                    range_desc = '< 3s'
+                elif time_mins < 0.1:
+                    range_desc = '3-6s'
+                elif time_mins < 0.2:
+                    range_desc = '6-12s'
+                elif time_mins < 0.4:
+                    range_desc = '12-24s'
+                else:
+                    range_desc = '> 24s'
+                
+                examples_content = f"[cyan]Similar ({range_desc}):[/]\n\n"
+                for ex in examples[:3]:
+                    desc = ex['desc'][:30] + "..." if len(ex['desc']) > 30 else ex['desc']
+                    target = ex['target'][:15] + "..." if len(ex['target']) > 15 else ex['target']
+                    examples_content += f"[yellow]{ex['time_secs']:.1f}s[/] {desc}\n[dim]→ {target}[/]\n\n"
+            else:
+                examples_content = "[dim]No similar examples[/]"
+            
+            layout["examples"].update(Panel(examples_content, title="Examples", style="cyan"))
+            
+            self.console.print(layout)
+            self.console.print("\n[green]ENTER[/]=Accept [red]D[/]=Delete [yellow]Number[/]=Update(seconds) [magenta]Q[/]=Quit")
+            
         else:
-            answer_section += f"Command: {Colors.colorize(metadata.get('bash_command', ''), Colors.GREEN)}"
-        
-        return header + info + examples_section + content_header + task_content + answer_section
+            # Full layout for tall terminals
+            layout = Layout()
+            layout.split_column(
+                Layout(name="header", size=3),
+                Layout(name="main"),
+                Layout(name="footer", size=3)
+            )
+            
+            layout["main"].split_row(
+                Layout(name="task", ratio=2),
+                Layout(name="examples", ratio=1)
+            )
+            
+            # Header
+            header_text = f"[bold blue]TASK REVIEW[/] [magenta]{task_num}/{total_tasks}[/] | [dim]Original: {original_pos}/{total_original}[/]\n"
+            header_text += f"[cyan]{task['task_id']}[/]"
+            layout["header"].update(Panel(header_text, style="blue"))
+            
+            # Task content
+            task_content = f"[bold cyan]ID:[/] {task['task_id']}\n"
+            task_content += f"[yellow]Type:[/] {task_type.upper()} | [yellow]Category:[/] {metadata.get('security_category', 'N/A')}\n"
+            task_content += f"[yellow]Source:[/] {timing_source} | [green]Current: {time_secs:.1f}s[/] [dim]({time_mins:.4f}min)[/]\n\n"
+            
+            # Format task based on type (full version)
+            if task_type == 'nl2bash':
+                task_content += f"[bold white]Task:[/] {nl}\n\n[dim]→ Convert to bash command[/]"
+            elif task_type in ['nl2bash-prefixed', 'nl2bash-prefix']:
+                prefix = metadata.get('command_prefix', '')
+                completion = metadata.get('expected_completion', '')
+                full_command = f"{prefix}{completion}"
+                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Complete this:[/] [cyan]{prefix}[/cyan][yellow]___|[/yellow]\n[bold white]Full answer:[/] [green]{full_command}[/]"
+            elif task_type == 'nl2bash-blanks':
+                template = metadata.get('template', '')
+                blank_template = template.replace('___', '[red]___[/red]')
+                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Fill blank:[/] {blank_template}"
+            elif task_type == 'contextual':
+                context = metadata.get('context', '')
+                task_content += f"[yellow]Context:[/] {context}\n[bold white]Task:[/] {nl}"
+            elif task_type == 'multi-step':
+                prev_cmd = metadata.get('previous_command', '')
+                prev_out = metadata.get('previous_output', '')
+                task_content += f"[bold white]Previous:[/] [cyan]{prev_cmd}[/]\n[bold white]Output:[/] [yellow]{prev_out}[/]\n[bold white]Next:[/] {nl}"
+            elif task_type == 'mcq':
+                choices = metadata.get('choices', [])
+                choices_text = '\n'.join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices)])
+                task_content += f"[bold white]Question:[/] {nl}\n\n{choices_text}\n\n[bold white]Answer:[/]"
+            elif task_type == 'single-char':
+                prefix = metadata.get('command_prefix', '')
+                task_content += f"[bold white]Task:[/] {nl}\n[bold white]Complete:[/] [cyan]{prefix}[/]"
+            
+            # Expected answer is already included in task-specific formatting above
+            
+            layout["task"].update(Panel(task_content, title="Task Content", style="white"))
+            
+            # Examples panel
+            examples = self._get_time_range_examples(time_mins)
+            if examples:
+                if time_mins < 0.05:
+                    range_desc = '< 3s'
+                elif time_mins < 0.1:
+                    range_desc = '3-6s'
+                elif time_mins < 0.2:
+                    range_desc = '6-12s'
+                elif time_mins < 0.4:
+                    range_desc = '12-24s'
+                else:
+                    range_desc = '> 24s'
+                
+                examples_content = f"[cyan]Similar timing ({range_desc}):[/]\n\n"
+                
+                for ex in examples:
+                    desc = ex['desc'][:45] + "..." if len(ex['desc']) > 45 else ex['desc']
+                    target = ex['target'][:20] + "..." if len(ex['target']) > 20 else ex['target']
+                    examples_content += f"[yellow]{ex['time_secs']:.1f}s[/] {desc}\n[dim]→ {target}[/]\n\n"
+            else:
+                examples_content = "[dim]No similar examples available[/]"
+            
+            layout["examples"].update(Panel(examples_content, title="Similar Tasks", style="cyan"))
+            
+            # Footer with controls
+            footer_content = "[bold green]ENTER[/] Accept | [bold red]D[/] Delete | [bold yellow]Number[/] Update (seconds) | [bold magenta]Q[/] Quit | [bold cyan]H[/] Help"
+            layout["footer"].update(Panel(footer_content, title="Controls", style="blue"))
+            
+            self.console.print(layout)
     
-    def _save_review_result(self, task: Dict[str, Any], action: str, 
-                           new_time: Optional[float] = None):
+    def _print_summary_stats(self):
+        """Print summary statistics at the start."""
+        timing_sources = Counter()
+        for task in self.tasks:
+            source = task.get('dataset_task_metadata', {}).get('timing_source', 'unknown')
+            timing_sources[source] += 1
+        
+        # Create summary table
+        table = Table(title="CyBashBench Task Review - Summary")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+        
+        table.add_row("Total tasks", str(len(self.tasks)))
+        table.add_row("", "")  # Spacer
+        
+        for source, count in timing_sources.items():
+            table.add_row(f"• {source}", str(count))
+        
+        self.console.print(table)
+        
+        # Distribution plot
+        plot_panel = Panel(self._create_distribution_plot(), title="Time Distribution", style="blue")
+        self.console.print(plot_panel)
+    
+    def _save_review_result(self, task: Dict[str, Any], action: str, new_time: Optional[float] = None):
         """Save review result."""
         result = {
             'task_id': task['task_id'],
@@ -214,68 +376,21 @@ class CyBashBenchReviewer:
         
         self.review_results.append(result)
     
-    def _print_summary_stats(self):
-        """Print summary statistics at the start."""
-        timing_sources = {}
-        for task in self.tasks:
-            source = task.get('dataset_task_metadata', {}).get('timing_source', 'unknown')
-            timing_sources[source] = timing_sources.get(source, 0) + 1
-        
-        print(f"\n{Colors.colorize('CYBASHBENCH TASK REVIEW', Colors.BOLD + Colors.WHITE)}")
-        print(f"{Colors.colorize('=' * 50, Colors.BLUE)}")
-        print(f"Total tasks: {Colors.colorize(str(len(self.tasks)), Colors.GREEN)}")
-        print(f"Timing sources:")
-        for source, count in timing_sources.items():
-            print(f"  • {Colors.colorize(source, Colors.YELLOW)}: {Colors.colorize(str(count), Colors.GREEN)} tasks")
-        
-        print(f"\n{Colors.colorize('Time distribution:', Colors.UNDERLINE)}")
-        for range_name, tasks in self.time_ranges.items():
-            range_labels = {
-                'very_fast': '< 3s',
-                'fast': '3-6s', 
-                'medium': '6-12s',
-                'slow': '12-24s',
-                'very_slow': '> 24s'
-            }
-            print(f"  • {Colors.colorize(range_labels[range_name], Colors.CYAN)}: {Colors.colorize(str(len(tasks)), Colors.GREEN)} tasks")
-    
-    def _print_help(self):
-        """Print help information."""
-        help_box = f"""
-{Colors.colorize('┌─ CONTROLS ─────────────────────────────────────────────────┐', Colors.BLUE)}
-{Colors.colorize('│', Colors.BLUE)} {Colors.colorize('ENTER', Colors.GREEN)}     Accept current time estimate and continue        {Colors.colorize('│', Colors.BLUE)}  
-{Colors.colorize('│', Colors.BLUE)} {Colors.colorize('D + ENTER', Colors.RED)}  Delete this task from the dataset               {Colors.colorize('│', Colors.BLUE)}
-{Colors.colorize('│', Colors.BLUE)} {Colors.colorize('Number', Colors.YELLOW)}     Update time estimate (in seconds, e.g., "2.5")  {Colors.colorize('│', Colors.BLUE)}
-{Colors.colorize('│', Colors.BLUE)} {Colors.colorize('Q + ENTER', Colors.MAGENTA)} Quit and save progress                          {Colors.colorize('│', Colors.BLUE)}
-{Colors.colorize('│', Colors.BLUE)} {Colors.colorize('H + ENTER', Colors.CYAN)}  Show this help again                            {Colors.colorize('│', Colors.BLUE)}
-{Colors.colorize('└────────────────────────────────────────────────────────────┘', Colors.BLUE)}
-        """
-        print(help_box)
-    
     def _update_task_timing_source(self, task: Dict[str, Any], action: str) -> Dict[str, Any]:
         """Update timing_source field based on review action."""
-        # Make a copy to avoid modifying original
         updated_task = task.copy()
         updated_task['dataset_task_metadata'] = task['dataset_task_metadata'].copy()
         
         current_source = task.get('dataset_task_metadata', {}).get('timing_source', '')
         
-        # Only update if it's not already human_calibration and action involves human review
         if current_source != 'human_calibration' and action in ['accepted', 'updated']:
             updated_task['dataset_task_metadata']['timing_source'] = 'human_reviewed'
         
         return updated_task
     
-    def _save_results(self):
-        """Save review results to file."""
-        with open(self.output_file, 'w') as f:
-            for result in self.review_results:
-                f.write(json.dumps(result) + '\n')
-    
     def review_tasks(self):
         """Main review loop."""
         self._print_summary_stats()
-        self._print_help()
         
         # Filter tasks that need review
         tasks_to_review = []
@@ -283,135 +398,121 @@ class CyBashBenchReviewer:
         
         for task in self.tasks:
             timing_source = task.get('dataset_task_metadata', {}).get('timing_source', '')
-            if timing_source in ['human_reviewed', 'human_calibration']:
+            if not self.rereview and timing_source in ['human_reviewed', 'human_calibration']:
                 skipped_count += 1
             else:
                 tasks_to_review.append(task)
         
-        if skipped_count > 0:
-            print(f"\n{Colors.colorize('ℹ Skipping', Colors.CYAN)} {Colors.colorize(str(skipped_count), Colors.YELLOW)} tasks that are already human-reviewed or human-calibrated")
+        if skipped_count > 0 and not self.rereview:
+            self.console.print(f"\n[cyan]ℹ Skipping[/] [yellow]{skipped_count}[/] tasks that are already human-reviewed or human-calibrated")
+        elif self.rereview:
+            self.console.print(f"\n[yellow]ℹ Re-review mode:[/] Including all tasks (even previously reviewed)")
         
         if not tasks_to_review:
-            print(f"\n{Colors.colorize('✓ All tasks have been reviewed!', Colors.GREEN)} No tasks need review.")
+            self.console.print("\n[green]✓ All tasks have been reviewed![/] No tasks need review.")
             return
         
-        print(f"\n{Colors.colorize('Reviewing', Colors.GREEN)} {Colors.colorize(str(len(tasks_to_review)), Colors.YELLOW)} tasks that need review\n")
+        self.console.print(f"\n[green]Reviewing[/] [yellow]{len(tasks_to_review)}[/] tasks that need review")
         
         for i, task in enumerate(tasks_to_review):
             task_num = i + 1
             total_to_review = len(tasks_to_review)
-            
-            # Find original position in full task list
             original_position = self.tasks.index(task) + 1
             total_tasks = len(self.tasks)
             
-            # Show both the review progress and original position
-            print(f"\n{Colors.colorize('REVIEW PROGRESS:', Colors.BOLD)} {task_num}/{total_to_review} | {Colors.colorize('ORIGINAL POSITION:', Colors.BOLD)} {original_position}/{total_tasks}")
-            print(self._format_task_prompt(task, task_num, total_to_review))
+            self._format_task_rich(task, task_num, total_to_review, original_position, total_tasks)
+            user_input = Prompt.ask("\n[bold]Action[/]", default="")
             
-            while True:
-                user_input = input(f"\n{Colors.colorize('Action:', Colors.BOLD)} ").strip()
+            if user_input == '':
+                self._save_review_result(task, 'accepted')
+                self.console.print("[green]✓ Accepted[/]")
+                    
+            elif user_input.upper() == 'D':
+                self._save_review_result(task, 'deleted')
+                self.console.print("[red]✗ Task marked for deletion[/]")
+                    
+            elif user_input.upper() == 'Q':
+                self.console.print("\n[yellow]Saving progress and exiting...[/]")
+                self._save_updated_tasks()
+                return
                 
-                if user_input == '':
-                    # Accept and continue
-                    self._save_review_result(task, 'accepted')
-                    print(f"{Colors.colorize('✓ Accepted', Colors.GREEN)}")
-                    break
-                    
-                elif user_input.upper() == 'D':
-                    # Delete task
-                    self._save_review_result(task, 'deleted')
-                    print(f"{Colors.colorize('✗ Task marked for deletion', Colors.RED)}")
-                    break
-                    
-                elif user_input.upper() == 'Q':
-                    # Quit
-                    print(f"\n{Colors.colorize('Saving progress and exiting...', Colors.YELLOW)}")
-                    self._save_results()
-                    self._save_updated_tasks()
-                    return
-                    
-                elif user_input.upper() == 'H':
-                    # Show help
-                    self._print_help()
+            else:
+                try:
+                    new_time_seconds = float(user_input)
+                    new_time_minutes = new_time_seconds / 60
+                    self._save_review_result(task, 'updated', new_time_minutes)
+                    self.console.print(f"[green]✓ Time updated to[/] [bold]{new_time_seconds}s[/] [dim]({new_time_minutes:.4f} minutes)[/]")
+                except ValueError:
+                    self.console.print(f"[red]Invalid input: '{user_input}'. Please try again.[/]")
                     continue
-                    
-                else:
-                    # Try to parse as number (seconds)
-                    try:
-                        new_time_seconds = float(user_input)
-                        new_time_minutes = new_time_seconds / 60
-                        self._save_review_result(task, 'updated', new_time_minutes)
-                        print(f"{Colors.colorize('✓ Time updated to', Colors.GREEN)} "
-                              f"{Colors.colorize(f'{new_time_seconds}s', Colors.BOLD)} "
-                              f"({new_time_minutes:.4f} minutes)")
-                        break
-                    except ValueError:
-                        print(f"{Colors.colorize(f'Invalid input: \"{user_input}\". Please try again.', Colors.RED)}")
         
-        # Save when done
-        print(f"\n{Colors.colorize('Review complete! Saving results...', Colors.GREEN)}")
-        self._save_results()
         self._save_updated_tasks()
     
     def _save_updated_tasks(self):
         """Save the updated task list based on review results."""
-        # Create a mapping of actions by task_id
-        actions = {}
-        for result in self.review_results:
-            actions[result['task_id']] = result
+        actions = {result['task_id']: result for result in self.review_results}
         
-        # Write updated tasks
-        updated_file = self.input_file.parent / "cybashbench_tasks_reviewed.jsonl"
-        with open(updated_file, 'w') as f:
+        # Create backup of original file
+        backup_file = self.input_file.with_suffix(self.input_file.suffix + '.backup')
+        import shutil
+        shutil.copy2(self.input_file, backup_file)
+        
+        # Write updated tasks directly to the input file
+        with open(self.input_file, 'w') as f:
             for task in self.tasks:
                 task_id = task['task_id']
                 if task_id in actions:
                     action = actions[task_id]
                     if action['action'] == 'deleted':
-                        continue  # Skip deleted tasks
+                        continue
                     
-                    # Update timing source for accepted/updated tasks
                     updated_task = self._update_task_timing_source(task, action['action'])
                     
                     if action['action'] == 'updated':
-                        # Update time
                         updated_task['human_minutes'] = action['new_time_minutes']
                     
                     f.write(json.dumps(updated_task) + '\n')
                 else:
-                    # Task not reviewed yet, save as-is
                     f.write(json.dumps(task) + '\n')
-        
-        print(f"\n{Colors.colorize('FILES SAVED:', Colors.BOLD)}")
-        print(f"  • Updated tasks: {Colors.colorize(str(updated_file), Colors.CYAN)}")
-        print(f"  • Review log: {Colors.colorize(str(self.output_file), Colors.CYAN)}")
         
         # Print summary
         accepted = sum(1 for r in self.review_results if r['action'] == 'accepted')
         updated = sum(1 for r in self.review_results if r['action'] == 'updated')
         deleted = sum(1 for r in self.review_results if r['action'] == 'deleted')
         
-        print(f"\n{Colors.colorize('REVIEW SUMMARY:', Colors.BOLD)}")
-        print(f"  • {Colors.colorize('Accepted:', Colors.GREEN)} {accepted}")
-        print(f"  • {Colors.colorize('Updated:', Colors.YELLOW)} {updated}")
-        print(f"  • {Colors.colorize('Deleted:', Colors.RED)} {deleted}")
-        print(f"  • {Colors.colorize('Total reviewed:', Colors.MAGENTA)} {len(self.review_results)}")
+        summary_table = Table(title="Review Summary")
+        summary_table.add_column("Action", style="cyan")
+        summary_table.add_column("Count", style="green")
+        
+        summary_table.add_row("Accepted", str(accepted))
+        summary_table.add_row("Updated", str(updated))
+        summary_table.add_row("Deleted", str(deleted))
+        summary_table.add_row("Total reviewed", str(len(self.review_results)))
+        
+        self.console.print(summary_table)
+        self.console.print(f"\n[cyan]Files saved:[/]\n• Updated tasks: {self.input_file}\n• Backup: {backup_file}")
 
 def main():
-    if len(sys.argv) > 1:
-        input_file = sys.argv[1]
-    else:
-        input_file = "/Users/speters/git/personal/human-ttc-eval/data/keep/cybashbench/cybashbench_tasks.jsonl"
+    parser = argparse.ArgumentParser(description="Interactive CyBashBench task reviewer")
+    parser.add_argument("input_file", nargs="?", 
+                       default="/Users/speters/git/personal/human-ttc-eval/data/keep/cybashbench/cybashbench_tasks.jsonl",
+                       help="Input JSONL file with tasks")
+    parser.add_argument("--rereview", action="store_true",
+                       help="Include previously reviewed tasks for re-review")
     
-    output_file = "review.jsonl"
+    args = parser.parse_args()
     
-    if not Path(input_file).exists():
-        print(f"{Colors.colorize('Error:', Colors.RED)} Input file '{input_file}' not found")
+    if not Path(args.input_file).exists():
+        print(f"Error: Input file '{args.input_file}' not found")
         sys.exit(1)
     
-    reviewer = CyBashBenchReviewer(input_file, output_file)
-    reviewer.review_tasks()
+    reviewer = CyBashBenchReviewer(args.input_file, args.rereview)
+    
+    try:
+        reviewer.review_tasks()
+    except KeyboardInterrupt:
+        reviewer.console.print("\n[yellow]Review interrupted. Progress saved.[/]")
+        reviewer._save_updated_tasks()
 
 if __name__ == "__main__":
     main()
