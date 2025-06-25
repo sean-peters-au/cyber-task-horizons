@@ -7,12 +7,15 @@ compared against human baselines, maintaining METR schema compatibility.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from datetime import datetime, timezone
 import uuid
 import json
 import logging
 from dataclasses import dataclass
+from urllib.parse import urlparse
+
+from inspect_ai.log import read_eval_log, list_eval_logs, EvalLog, EvalSample
 
 from .run import Run
 
@@ -364,4 +367,214 @@ class Bench(ABC):
         with open(result_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
-        return BenchResult.from_dict(data) 
+        return BenchResult.from_dict(data)
+
+    def find_existing_eval_log(self, model_name: str, log_dir: Optional[Path] = None) -> Optional[Path]:
+        """
+        Find the most recent .eval log file for a given model.
+        
+        Args:
+            model_name: The model identifier
+            log_dir: Directory to search for logs (defaults to output_dir/inspect_logs)
+            
+        Returns:
+            Path to the most recent .eval file, or None if not found
+        """
+        if log_dir is None:
+            log_dir = self.output_dir / "inspect_logs"
+        
+        if not log_dir.exists():
+            return None
+            
+        # Look for .eval files matching the model name
+        eval_files = list(log_dir.glob(f"*{model_name.replace('/', '_')}*.eval"))
+        
+        if not eval_files:
+            return None
+            
+        # Return the most recent file
+        return max(eval_files, key=lambda p: p.stat().st_mtime)
+    
+    def find_all_eval_logs(self, model_name: str, log_dir: Optional[Path] = None) -> List[Path]:
+        """
+        Find all .eval log files for a given model using the inspect_ai API.
+        
+        Args:
+            model_name: The model identifier
+            log_dir: Directory to search for logs (defaults to output_dir/inspect_logs)
+            
+        Returns:
+            List of paths to .eval files, sorted from oldest to newest
+        """
+        if log_dir is None:
+            log_dir = self.output_dir / "inspect_logs"
+        
+        logger.info(f"Searching for .eval logs for model '{model_name}' in: {log_dir.resolve()}")
+
+        if not log_dir.exists():
+            logger.warning(f"Log directory not found: {log_dir.resolve()}")
+            return []
+
+        try:
+            # Use inspect_ai's API to list logs
+            all_logs = list_eval_logs(str(log_dir))
+            logger.info(f"Found {len(all_logs)} total .eval files. Checking headers for model name...")
+
+            matching_files = []
+            for log_info in all_logs:
+                try:
+                    # Read only the header to efficiently check the model name
+                    # Pass the EvalLogInfo object directly to read_eval_log
+                    log_header = read_eval_log(log_info, header_only=True)
+                    if log_header.eval and log_header.eval.model == model_name:
+                        # The location is a file URI, parse it to get a Path
+                        parsed_uri = urlparse(log_header.location)
+                        matching_files.append(Path(parsed_uri.path))
+                except Exception as e:
+                    logger.warning(f"Could not read or parse header from log info object: {e}")
+
+            if not matching_files:
+                logger.warning(f"No log files found for model '{model_name}'.")
+            else:
+                logger.info(f"Found {len(matching_files)} log file(s) for model '{model_name}'.")
+
+            # Sort by modification time (oldest first)
+            return sorted(matching_files, key=lambda p: p.stat().st_mtime)
+
+        except Exception as e:
+            logger.error(f"Failed to list or read eval logs using inspect_ai API: {e}")
+            return []
+    
+    def extract_completed_task_ids(self, eval_log_path: Path) -> Set[str]:
+        """
+        Extract completed task IDs from an inspect .eval log file.
+        
+        Args:
+            eval_log_path: Path to the .eval log file
+            
+        Returns:
+            Set of completed task IDs
+        """
+        completed_tasks = set()
+        
+        try:
+            # Pass path as a string to be safe
+            log = read_eval_log(str(eval_log_path))
+            for sample in log.samples:
+                completed_tasks.add(sample.id)
+            logger.info(f"Found {len(completed_tasks)} completed tasks in {eval_log_path}")
+            
+        except Exception as e:
+            logger.error(f"Error reading eval log {eval_log_path} with inspect_ai: {e}")
+            
+        return completed_tasks
+    
+    def _extract_score_from_sample(self, sample: EvalSample) -> tuple[float, int]:
+        """Extract score from an inspect_ai EvalSample object."""
+        if not sample.scores:
+            return 0.0, 0
+        
+        for key in ['includes', 'accuracy', 'score', 'correct']:
+            if key in sample.scores:
+                score_obj = sample.scores[key]
+                if hasattr(score_obj, 'value'):
+                    score_value = score_obj.value
+                    if isinstance(score_value, str):
+                        val, binarized = (1.0, 1) if score_value == 'C' else (0.0, 0)
+                        return val, binarized
+                    elif isinstance(score_value, (int, float)):
+                        val = float(score_value)
+                        return (val, 1 if val > 0 else 0)
+                elif isinstance(score_obj, (float, int)):
+                    val = float(score_obj)
+                    return (val, 1 if val > 0 else 0)
+        return 0.0, 0
+
+    def extract_completed_runs(self, eval_log_paths: List[Path], model_name: str, model_alias: str) -> List[Run]:
+        """
+        Extract completed runs from multiple eval log files.
+        
+        Args:
+            eval_log_paths: List of paths to .eval log files
+            model_name: The model identifier
+            model_alias: The model alias
+            
+        Returns:
+            List of Run objects from completed evaluations
+        """
+        completed_runs = []
+        seen_task_ids = set()
+        
+        # Process files from newest to oldest to get the most recent result for each task
+        for log_path in reversed(eval_log_paths):
+            try:
+                # Pass path as a string to be safe
+                log = read_eval_log(str(log_path))
+                if log.status != "success" and not log.samples:
+                    logger.warning(f"Skipping log with status '{log.status}' and no samples: {log_path.name}")
+                    continue
+
+                for sample in log.samples:
+                    task_id = sample.id
+                    if not task_id or task_id in seen_task_ids:
+                        continue
+                        
+                    seen_task_ids.add(task_id)
+                    
+                    # Convert sample to Run object
+                    score_cont, score = self._extract_score_from_sample(sample)
+                    
+                    # Create Run object
+                    run = Run(
+                        task_id=task_id,
+                        task_family=self._get_task_family_for_task(task_id),
+                        run_id=f"{model_name.replace('/', '_')}_{task_id}_{uuid.uuid4().hex[:8]}",
+                        alias=model_alias,
+                        model=model_name,
+                        score_binarized=score,
+                        score_cont=score_cont,
+                        human_minutes=self._get_human_minutes_for_task(task_id),
+                        human_source="baseline",
+                        task_source=self.dataset_name,
+                        generation_cost=self._get_generation_cost(sample),
+                        started_at=self._get_timestamp(log.eval.created),
+                        completed_at=self._get_timestamp(log.stats.completed_at),
+                    )
+                    completed_runs.append(run)
+                    
+            except Exception as e:
+                logger.error(f"Error extracting runs from {log_path} using inspect_ai: {e}")
+                
+        logger.info(f"Extracted {len(completed_runs)} completed runs from {len(eval_log_paths)} log files")
+        return completed_runs
+
+    def _get_timestamp(self, value: Any) -> float:
+        """Safely convert a datetime object or an ISO string to a UNIX timestamp."""
+        if not value:
+            return 0.0
+        if isinstance(value, datetime):
+            return value.timestamp()
+        if isinstance(value, str):
+            try:
+                # Handle ISO format strings, including those with 'Z' for UTC
+                return datetime.fromisoformat(value.replace('Z', '+00:00')).timestamp()
+            except ValueError:
+                logger.warning(f"Could not parse timestamp string: {value}")
+                return 0.0
+        logger.warning(f"Unhandled timestamp type: {type(value)}")
+        return 0.0
+
+    def _get_generation_cost(self, sample: EvalSample) -> float:
+        """Safely extract generation cost from a sample, handling different formats."""
+        if not sample.model_usage:
+            return 0.0
+        
+        # Handle case where model_usage is an object (newer format)
+        if hasattr(sample.model_usage, 'total_tokens'):
+            return float(sample.model_usage.total_tokens)
+        
+        # Handle case where model_usage is a dict (older format)
+        if isinstance(sample.model_usage, dict) and 'total_tokens' in sample.model_usage:
+            return float(sample.model_usage['total_tokens'])
+            
+        return 0.0 

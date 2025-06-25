@@ -120,6 +120,25 @@ class NyuctfBench(Bench):
         model_alias = model_alias or model_name
 
         is_human_eval = model_name.lower() == "human"
+        is_local = model_name in LOCAL_MODEL_CONFIGS
+        resume = kwargs.get('resume', False)
+        
+        # Check for existing evaluation logs if resume is requested
+        completed_task_ids = set()
+        completed_runs = []
+        if resume:
+            eval_logs = self.find_all_eval_logs(model_name)
+            if eval_logs:
+                logger.info(f"Found {len(eval_logs)} existing evaluation log(s)")
+                
+                # Extract completed task IDs from all logs
+                for log_path in eval_logs:
+                    completed_task_ids.update(self.extract_completed_task_ids(log_path))
+                
+                if completed_task_ids:
+                    logger.info(f"Resuming evaluation - found {len(completed_task_ids)} completed tasks across all runs")
+                    # Extract completed runs for final result merging
+                    completed_runs = self.extract_completed_runs(eval_logs, model_name, model_alias)
 
         if not is_human_eval:
             if model_name in getattr(main_config, 'NYUCTF_IMPUTE_ZERO', []):
@@ -132,7 +151,6 @@ class NyuctfBench(Bench):
             if "/" not in model_name:
                 return self._create_error_result(model_name, model_alias, start_time, "Model name must be in provider/model format")
             
-            is_local = model_name in LOCAL_MODEL_CONFIGS
             if is_local and not validate_local_server(model_name):
                 msg = f"Local server not running for {model_name}. Run 'make start-local-model-server MODEL={model_name}' first."
                 return self._create_error_result(model_name, model_alias, start_time, msg)
@@ -140,6 +158,41 @@ class NyuctfBench(Bench):
         tasks = self._load_tasks(task_ids)
         if not tasks:
             return self._create_error_result(model_name, model_alias, start_time, "No tasks loaded")
+        
+        # Filter out completed tasks if resuming
+        if completed_task_ids:
+            original_count = len(tasks)
+            tasks = [t for t in tasks if t.get('task_id') not in completed_task_ids]
+            logger.info(f"Filtered tasks: {original_count} -> {len(tasks)} (skipped {original_count - len(tasks)} completed)")
+            
+            if not tasks:
+                logger.info("All tasks already completed. Returning merged results from previous runs.")
+                
+                # Return a BenchResult with the completed runs
+                summary_stats = self._calculate_summary_stats(completed_runs)
+                summary_stats.update(self._calculate_nyuctf_stats(
+                    completed_runs, 
+                    [t for t in self._load_tasks(task_ids) if t.get('task_id') in completed_task_ids]
+                ))
+                
+                end_time = datetime.now(timezone.utc)
+                duration = (end_time - start_time).total_seconds()
+                
+                return BenchResult(
+                    dataset_name=self.dataset_name,
+                    model_name=model_name,
+                    model_alias=model_alias,
+                    runs=completed_runs,
+                    summary_stats=summary_stats,
+                    metadata={
+                        "duration_seconds": duration,
+                        "num_tasks": len(completed_runs),
+                        "resumed": True,
+                        "num_eval_logs_merged": len(eval_logs),
+                    },
+                    timestamp=start_time.isoformat(),
+                    success=True
+                )
         
         logger.info(f"Starting NYUCTF evaluation with {len(tasks)} tasks on model: {model_name}")
         
@@ -178,8 +231,22 @@ class NyuctfBench(Bench):
                 )
             
             runs = self._parse_inspect_results(eval_result, tasks, model_name, model_alias)
+            
+            # Merge with completed runs if resuming
+            if completed_runs:
+                logger.info(f"Merging {len(runs)} new runs with {len(completed_runs)} completed runs")
+                runs.extend(completed_runs)
+            
             summary_stats = self._calculate_summary_stats(runs)
-            summary_stats.update(self._calculate_nyuctf_stats(runs, tasks))
+            
+            # For NYUCTF stats, we need all tasks (including completed ones)
+            all_task_data = tasks
+            if completed_task_ids:
+                # Load the full task list to get metadata for completed tasks
+                all_tasks = self._load_tasks(task_ids)
+                all_task_data = [t for t in all_tasks if t.get('task_id') in {r.task_id for r in runs}]
+            
+            summary_stats.update(self._calculate_nyuctf_stats(runs, all_task_data))
             
             return BenchResult(
                 dataset_name=self.dataset_name, model_name=model_name, model_alias=model_alias,
@@ -187,7 +254,10 @@ class NyuctfBench(Bench):
                 metadata={
                     "duration_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
                     "num_tasks": len(tasks), "inspect_ai_version": inspect_ai.__version__,
-                    "max_messages": self.max_messages, "is_local_model": is_local
+                    "max_messages": self.max_messages, "is_local_model": is_local,
+                    "resumed": bool(completed_runs),
+                    "num_completed_from_previous": len(completed_runs),
+                    "num_new_completions": len(runs) - len(completed_runs) if completed_runs else len(runs),
                 },
                 timestamp=start_time.isoformat(), success=True
             )

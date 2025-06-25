@@ -147,9 +147,11 @@ def cli_retrieve_run(dataset_name: str):
               help="Number of evaluation runs for statistical analysis.")
 @click.option("--task-ids", 
               help="Comma-separated list of specific task IDs to run. If not provided, runs all tasks for the dataset.")
-def cli_benchmark(dataset_name: str, model: str, num_runs: int, task_ids: Optional[str]):
+@click.option("--resume", is_flag=True, default=False,
+              help="Resume from previous evaluation by skipping completed tasks.")
+def cli_benchmark(dataset_name: str, model: str, num_runs: int, task_ids: Optional[str], resume: bool):
     """Run benchmark evaluation on a dataset using a specified model."""
-    logger.info(f"CLI benchmark initiated for dataset: {dataset_name}, model: {model}")
+    logger.info(f"CLI benchmark initiated for dataset: {dataset_name}, model: {model}, resume: {resume}")
     
     try:
         bench_class = get_bench(dataset_name)
@@ -199,7 +201,8 @@ def cli_benchmark(dataset_name: str, model: str, num_runs: int, task_ids: Option
             result = bench_instance.run_evaluation(
                 model_name=model,
                 model_alias=model,
-                task_ids=task_list
+                task_ids=task_list,
+                resume=resume
             )
             all_run_results.append(result)
             
