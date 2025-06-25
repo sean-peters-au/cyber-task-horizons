@@ -162,10 +162,20 @@ class NyuctfBench(Bench):
                     eval_params["model_base_url"] = LOCAL_MODEL_CONFIGS[model_name]["base_url"]
             
             max_connections = 1 if is_human_eval else 5
-            eval_result = inspect_eval(
-                inspect_task, retry_on_error=3, fail_on_error=0.1, 
-                max_connections=max_connections, **eval_params
-            )
+            
+            # Add model-specific options for timeout and retries
+            if is_human_eval:
+                eval_result = inspect_eval(
+                    inspect_task, retry_on_error=3, fail_on_error=0.1, 
+                    max_connections=max_connections, **eval_params
+                )
+            else:
+                eval_result = inspect_eval(
+                    inspect_task, retry_on_error=3, fail_on_error=0.1, 
+                    max_connections=max_connections, 
+                    timeout=30, max_retries=5,
+                    **eval_params
+                )
             
             runs = self._parse_inspect_results(eval_result, tasks, model_name, model_alias)
             summary_stats = self._calculate_summary_stats(runs)
