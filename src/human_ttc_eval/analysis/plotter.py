@@ -272,7 +272,7 @@ def _create_single_horizon_plot(
         
         # Set fixed y-axis limits as requested: 0 to 4 hours (240 minutes)
         # Lower limit must include GPT-2's value of 6.2e-05 (0.000062)
-        lower_y_lim = 1e-2   # 0.000001 minutes (0.06 seconds) to include GPT-2
+        lower_y_lim = 0.1 / 60  # 0.1 seconds in minutes
         upper_y_lim = 240    # 4 hours in minutes
         
         logger.info(f"Calculated y-axis limits: {lower_y_lim:.8f} to {upper_y_lim:.8f}")
@@ -340,6 +340,7 @@ def _create_single_horizon_plot(
         'openai/davinci-002',
         'anthropic/claude-3-5-sonnet-20240620',
         'openai/gpt-3.5-turbo',
+        'openai/gpt2-xl',
     ]
     
     if agent_to_alias_map:
