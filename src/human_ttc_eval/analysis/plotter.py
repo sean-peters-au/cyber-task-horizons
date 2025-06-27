@@ -339,7 +339,9 @@ def _create_single_horizon_plot(
         'google/gemini-2.5-pro-preview-06-05',
         'openai/davinci-002',
         'anthropic/claude-3-5-sonnet-20240620',
+        'anthropic/claude-3-5-sonnet-20241022',
         'openai/gpt-3.5-turbo',
+        'openai/o3-2025-04-16',
         'openai/gpt2-xl',
     ]
     
