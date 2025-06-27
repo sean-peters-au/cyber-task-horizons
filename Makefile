@@ -22,6 +22,9 @@ THIRD_PARTY_REPOS = \
     https://github.com/NYU-LLM-CTF/NYU_CTF_Bench.git \
     https://github.com/TellinaTool/nl2bash.git
 
+# Custom Docker image
+CUSTOM_AGENT_IMAGE = human-ttc-eval-agent:latest
+
 # --- Model tiers for benchmarking ---
 # Tier 1: Fastest and cheapest models, for quick checks.
 MODELS_1 = \
@@ -70,7 +73,14 @@ MODELS_PUBLICATION = \
 .PHONY: all help datasets docs clean clean_datasets clean_benchmarks clean_docs test \
         retrieve prepare describe bench retrieve-all prepare-all describe-all \
         plot third-party repro progress run-gpt2xl-local \
-        run-davinci-local start-local-model-servers stop-local-model-servers
+        run-davinci-local start-local-model-servers stop-local-model-servers \
+        build-agent-image
+
+# --- Docker Image Build ---
+build-agent-image:
+	@echo ">>> Building custom agent Docker image..."
+	@docker build --platform linux/amd64 -t $(CUSTOM_AGENT_IMAGE) -f src/human_ttc_eval/docker/Dockerfile .
+	@echo ">>> Custom agent image '$(CUSTOM_AGENT_IMAGE)' built successfully."
 
 # --- Third-Party Repository Setup ---
 third-party:
