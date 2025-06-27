@@ -34,6 +34,7 @@ DEFAULT_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 LLM_BATCH_SIZE = 100
 LLM_MAX_TOKENS = 4096
 LLM_TEMPERATURE = 0.1
+LLM_MAX_CONNECTIONS = 2 # Default concurrency for inspect_ai
 
 # NL2Bash Configuration
 ENABLE_LLM_TIMING = False  # Set to False to skip LLM time estimation
@@ -42,7 +43,7 @@ NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100
 NL2BASH_SAMPLE_SIZE = 200
 # CyBench Configuration (user-tunable parameters)
-CYBENCH_MAX_ITERATIONS = 30  # Maximum iterations per task (5 is the default in cybench)
+CYBENCH_MAX_ITERATIONS = 50
 CYBENCH_IMPUTE_ZERO = [
     "openai/gpt2-xl",
     "openai/davinci-002",

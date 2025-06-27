@@ -34,7 +34,7 @@ from inspect_ai.solver import Solver
 from inspect_ai.tool import bash, python, tool_with
 
 from . import config as nyuctf_config
-from . import docker_utils, network_utils
+from . import docker_utils
 
 
 logger = logging.getLogger(__name__)
@@ -214,7 +214,16 @@ class NyuctfBench(Bench):
                 if model_name in LOCAL_MODEL_CONFIGS:
                     eval_params["model_base_url"] = LOCAL_MODEL_CONFIGS[model_name]["base_url"]
             
-            max_connections = 1 if is_human_eval else 5
+            # Limit concurrency to 1 for NYUCTF to avoid network alias collisions.
+            # When multiple NYUCTF tasks run concurrently they share the same
+            # category-level network alias (e.g. "pwn.chal.csaw.io"). Docker's
+            # embedded DNS will then round-robin or arbitrarily resolve that
+            # alias to one of the active containers, so an agent working on
+            # task-A can end up talking to the service for task-B and get a
+            # "connection refused" (or worse, receive the wrong binary).  Running
+            # the tasks strictly sequentially avoids that race condition until
+            # we implement unique per-task aliases.
+            max_connections = 1
             
             # Add model-specific options for timeout and retries
             if is_human_eval:

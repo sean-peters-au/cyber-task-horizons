@@ -161,6 +161,9 @@ class NyuctfPrepare(Prepare):
         logger.info("Starting NYUCTF dataset preparation")
         
         human_time_estimates = self._load_human_time_estimates()
+        # Use the task IDs from the human runs file as the ground truth set
+        ground_truth_task_ids = set(human_time_estimates.keys())
+        logger.info(f"Using fixed set of {len(ground_truth_task_ids)} tasks from the human runs file.")
         
         raw_input_file = self.raw_data_dir / self.default_raw_input_filename
         if not raw_input_file.exists():
@@ -180,6 +183,11 @@ class NyuctfPrepare(Prepare):
                     
                     # Extract fields
                     task_id = raw_data.get("task_id")
+
+                    # Only include tasks that are in our curated ground truth set
+                    if task_id not in ground_truth_task_ids:
+                        continue
+                    
                     name = raw_data.get("name", "")
                     category = raw_data.get("category", "unknown")
                     year = raw_data.get("year", "")
@@ -254,114 +262,5 @@ class NyuctfPrepare(Prepare):
             logger.error(f"An unexpected error occurred during NYUCTF preparation: {e}", exc_info=True)
             return []
         
-        # Apply sampling if configured
-        if hasattr(config, 'NYUCTF_SAMPLE_SIZE') and config.NYUCTF_SAMPLE_SIZE and config.NYUCTF_SAMPLE_SIZE < len(runs):
-            runs = self._sample_runs(runs, config.NYUCTF_SAMPLE_SIZE)
-        
+        # Sampling is no longer needed as we use a fixed set from human_runs.jsonl
         return runs
-    
-    def _sample_runs(self, runs: List[Run], sample_size: int) -> List[Run]:
-        """
-        Sample runs with optional stratification by difficulty (points).
-        
-        Args:
-            runs: List of all runs to sample from
-            sample_size: Number of runs to sample
-            
-        Returns:
-            Sampled list of runs
-        """
-        if sample_size >= len(runs):
-            return runs
-        
-        # Set random seed for reproducibility
-        if hasattr(config, 'NYUCTF_RANDOM_SEED') and config.NYUCTF_RANDOM_SEED is not None:
-            random.seed(config.NYUCTF_RANDOM_SEED)
-        
-        # Check if stratified sampling is enabled
-        stratify = getattr(config, 'NYUCTF_STRATIFY_BY_POINTS', True)
-        
-        if not stratify:
-            # Simple random sampling
-            sampled_runs = random.sample(runs, sample_size)
-            logger.info(f"Randomly sampled {len(sampled_runs)} runs from {len(runs)} total")
-            return sampled_runs
-        
-        # Stratified sampling by points (difficulty)
-        # First, we need to get points from raw data cache
-        runs_with_points = []
-        for run in runs:
-            if run.task_id in self._raw_data_cache:
-                points = self._raw_data_cache[run.task_id].get('points', 0)
-                runs_with_points.append((run, points))
-            else:
-                # Fallback - assign default points
-                runs_with_points.append((run, 0))
-        
-        # Categorize by difficulty based on points
-        easy_runs = [run for run, points in runs_with_points if points <= 100]
-        medium_runs = [run for run, points in runs_with_points if 100 < points <= 300]
-        hard_runs = [run for run, points in runs_with_points if points > 300]
-        
-        logger.info(f"Points distribution: Easy (≤100): {len(easy_runs)}, Medium (100-300): {len(medium_runs)}, Hard (>300): {len(hard_runs)}")
-        
-        # Calculate proportional sample sizes
-        total_runs = len(runs)
-        easy_proportion = len(easy_runs) / total_runs if total_runs > 0 else 0
-        medium_proportion = len(medium_runs) / total_runs if total_runs > 0 else 0
-        hard_proportion = len(hard_runs) / total_runs if total_runs > 0 else 0
-        
-        easy_sample_size = max(1, round(sample_size * easy_proportion)) if easy_runs else 0
-        medium_sample_size = max(1, round(sample_size * medium_proportion)) if medium_runs else 0
-        hard_sample_size = max(1, round(sample_size * hard_proportion)) if hard_runs else 0
-        
-        # Adjust if total exceeds sample_size
-        total_allocated = easy_sample_size + medium_sample_size + hard_sample_size
-        if total_allocated > sample_size:
-            # Reduce the largest group
-            if easy_sample_size >= medium_sample_size and easy_sample_size >= hard_sample_size:
-                easy_sample_size = max(1, easy_sample_size - (total_allocated - sample_size))
-            elif medium_sample_size >= hard_sample_size:
-                medium_sample_size = max(1, medium_sample_size - (total_allocated - sample_size))
-            else:
-                hard_sample_size = max(1, hard_sample_size - (total_allocated - sample_size))
-        elif total_allocated < sample_size:
-            # Add to the largest group that has remaining items
-            remaining = sample_size - total_allocated
-            if easy_runs and easy_sample_size < len(easy_runs):
-                easy_sample_size = min(len(easy_runs), easy_sample_size + remaining)
-            elif medium_runs and medium_sample_size < len(medium_runs):
-                medium_sample_size = min(len(medium_runs), medium_sample_size + remaining)
-            elif hard_runs and hard_sample_size < len(hard_runs):
-                hard_sample_size = min(len(hard_runs), hard_sample_size + remaining)
-        
-        # Sample from each difficulty category
-        sampled_runs = []
-        
-        if easy_runs and easy_sample_size > 0:
-            sampled_easy = random.sample(easy_runs, min(easy_sample_size, len(easy_runs)))
-            sampled_runs.extend(sampled_easy)
-            logger.info(f"Sampled {len(sampled_easy)} easy tasks")
-        
-        if medium_runs and medium_sample_size > 0:
-            sampled_medium = random.sample(medium_runs, min(medium_sample_size, len(medium_runs)))
-            sampled_runs.extend(sampled_medium)
-            logger.info(f"Sampled {len(sampled_medium)} medium tasks")
-        
-        if hard_runs and hard_sample_size > 0:
-            sampled_hard = random.sample(hard_runs, min(hard_sample_size, len(hard_runs)))
-            sampled_runs.extend(sampled_hard)
-            logger.info(f"Sampled {len(sampled_hard)} hard tasks")
-        
-        # If we still need more samples, fill from any remaining runs
-        if len(sampled_runs) < sample_size:
-            sampled_task_ids = {run.task_id for run in sampled_runs}
-            remaining_runs = [run for run in runs if run.task_id not in sampled_task_ids]
-            if remaining_runs:
-                additional_needed = sample_size - len(sampled_runs)
-                additional_runs = random.sample(remaining_runs, min(additional_needed, len(remaining_runs)))
-                sampled_runs.extend(additional_runs)
-                logger.info(f"Added {len(additional_runs)} additional tasks to reach target sample size")
-        
-        logger.info(f"Stratified sampling: selected {len(sampled_runs)} runs from {len(runs)} total")
-        return sampled_runs

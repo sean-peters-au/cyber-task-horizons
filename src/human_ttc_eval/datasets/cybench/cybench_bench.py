@@ -113,9 +113,22 @@ class CybenchBench(Bench):
         start_time = datetime.now(timezone.utc)
         model_alias = model_alias or model_name
         is_human_eval = model_name.lower() == "human"
-
-        # Set is_local for the final metadata, default to False for human eval
-        is_local = False
+        is_local = model_name in LOCAL_MODEL_CONFIGS
+        
+        # Resume logic
+        resume = kwargs.get('resume', False)
+        completed_task_ids = set()
+        completed_runs = []
+        eval_logs = []
+        if resume and not is_human_eval:
+            eval_logs = self.find_all_eval_logs(model_name)
+            if eval_logs:
+                logger.info(f"Found {len(eval_logs)} existing evaluation log(s) for resumption.")
+                for log_path in eval_logs:
+                    completed_task_ids.update(self.extract_completed_task_ids(log_path))
+                if completed_task_ids:
+                    logger.info(f"Found {len(completed_task_ids)} completed tasks across all logs.")
+                    completed_runs = self.extract_completed_runs(eval_logs, model_name, model_alias)
 
         if not is_human_eval:
             # Check for zero-imputation first
@@ -135,25 +148,47 @@ class CybenchBench(Bench):
                 logger.error(error_msg)
                 return self._create_error_result(model_name, model_alias, start_time, error_msg)
             
-            # Check if this is a local model
-            is_local = model_name in LOCAL_MODEL_CONFIGS
+            # Check if this is a local model and if the server is running
             if is_local and not validate_local_server(model_name):
                 error_msg = f"Local server not running for {model_name}. Run 'make start-local-model-server MODEL={model_name}' first."
                 logger.error(error_msg)
                 return self._create_error_result(model_name, model_alias, start_time, error_msg)
         
         # Load tasks
-        tasks = self._load_tasks(task_ids)
-        if not tasks:
+        all_tasks_for_stats = self._load_tasks(task_ids) # Keep a full copy for stats later
+        tasks_to_run = all_tasks_for_stats
+        
+        # Filter out completed tasks if resuming
+        if completed_task_ids:
+            tasks_to_run = [t for t in all_tasks_for_stats if t.get('task_id') not in completed_task_ids]
+            logger.info(f"Filtered tasks: {len(all_tasks_for_stats)} -> {len(tasks_to_run)} to run.")
+
+            if not tasks_to_run:
+                logger.info("All tasks already completed. Returning merged results from previous runs.")
+                summary_stats = self._calculate_summary_stats(completed_runs)
+                summary_stats.update(self._calculate_cybench_stats(completed_runs, all_tasks_for_stats))
+                
+                return BenchResult(
+                    dataset_name=self.dataset_name, model_name=model_name, model_alias=model_alias,
+                    runs=completed_runs, summary_stats=summary_stats,
+                    metadata={
+                        "duration_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
+                        "num_tasks": len(completed_runs), "resumed": True,
+                        "num_eval_logs_merged": len(eval_logs)
+                    },
+                    timestamp=start_time.isoformat(), success=True
+                )
+        
+        if not tasks_to_run:
             error_msg = "No tasks loaded for evaluation"
             logger.error(error_msg)
             return self._create_error_result(model_name, model_alias, start_time, error_msg)
         
-        logger.info(f"Starting CyBench evaluation with {len(tasks)} tasks on model: {model_name}")
+        logger.info(f"Starting CyBench evaluation with {len(tasks_to_run)} tasks on model: {model_name}")
         
         try:
             # Create inspect_ai task
-            inspect_task = self._create_inspect_task(tasks)
+            inspect_task = self._create_inspect_task(tasks_to_run)
             
             # Prepare eval parameters
             eval_params = {
@@ -176,7 +211,7 @@ class CybenchBench(Bench):
                     local_config = LOCAL_MODEL_CONFIGS[model_name]
                     eval_params["model_base_url"] = local_config["base_url"]
             
-            max_connections = 1 if is_human_eval else 5
+            max_connections = 1 if is_human_eval else config.LLM_MAX_CONNECTIONS
             
             # Run evaluation
             eval_result = inspect_eval(
@@ -188,13 +223,16 @@ class CybenchBench(Bench):
             )
             
             # Parse results into Run objects
-            runs = self._parse_inspect_results(eval_result, tasks, model_name, model_alias)
+            new_runs = self._parse_inspect_results(eval_result, tasks_to_run, model_name, model_alias)
+            
+            # Merge with previous runs if resuming
+            runs = new_runs + completed_runs
             
             # Calculate summary statistics
             summary_stats = self._calculate_summary_stats(runs)
             
-            # Add CyBench-specific stats
-            summary_stats.update(self._calculate_cybench_stats(runs, tasks))
+            # Add CyBench-specific stats using all tasks for context
+            summary_stats.update(self._calculate_cybench_stats(runs, all_tasks_for_stats))
             
             # Create successful result
             end_time = datetime.now(timezone.utc)
@@ -208,12 +246,15 @@ class CybenchBench(Bench):
                 summary_stats=summary_stats,
                 metadata={
                     "duration_seconds": duration,
-                    "num_tasks": len(tasks),
+                    "num_tasks": len(runs),
                     "inspect_ai_version": inspect_ai.__version__,
                     "max_attempts": self.max_attempts,
                     "max_messages": self.max_messages,
                     "is_local_model": is_local,
-                    "sandbox_type": "docker"
+                    "sandbox_type": "docker",
+                    "resumed": resume,
+                    "num_completed_from_previous": len(completed_runs),
+                    "num_new_completions": len(new_runs),
                 },
                 timestamp=start_time.isoformat(),
                 success=True,

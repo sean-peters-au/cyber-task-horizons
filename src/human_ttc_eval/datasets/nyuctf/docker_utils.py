@@ -4,13 +4,14 @@ Handles the generation and manipulation of Docker Compose files.
 """
 import logging
 import socket
+import subprocess
 import tempfile
+import json
 import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 
 from . import config as nyuctf_config
-from . import network_utils
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,26 @@ def extract_category_from_path(compose_file_path: Path) -> Optional[str]:
         return None
 
 
+def _get_ctfnet_subnet() -> Optional[str]:
+    """Inspects the ctfnet network on the host to get its subnet."""
+    try:
+        result = subprocess.run(
+            ["docker", "network", "inspect", nyuctf_config.NETWORK_NAME],
+            capture_output=True, text=True, check=True, encoding='utf-8'
+        )
+        network_data = json.loads(result.stdout)
+        if network_data and network_data[0].get("IPAM", {}).get("Config"):
+            subnet = network_data[0]["IPAM"]["Config"][0].get("Subnet")
+            if subnet:
+                logger.info(f"Dynamically found ctfnet subnet: {subnet}")
+                return subnet
+        logger.warning("Could not find subnet in ctfnet network configuration.")
+        return None
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError, IndexError) as e:
+        logger.error(f"Failed to inspect ctfnet network, firewall may be incomplete: {e}")
+        return None
+
+
 def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, Any]]:
     """
     Modifies a docker-compose.yml file for the evaluation environment.
@@ -60,18 +81,27 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
         compose_data = {'services': {}}
 
     port_info = {}
+    
+    # Get the ctfnet subnet to pass to the agent
+    ctfnet_subnet = _get_ctfnet_subnet()
 
     # 1. Add agent service
-    _add_agent_service(compose_data)
+    _add_agent_service(compose_data, ctfnet_subnet)
 
     # 2. Process existing challenge services
     category = extract_category_from_path(original_compose_file)
     for service_name, service_config in compose_data.get('services', {}).items():
         if service_name == 'default':
+            # This is our custom agent, ensure platform is set for ARM hosts
+            service_config['platform'] = 'linux/amd64'
             continue
         
         # Add network alias
         _add_network_alias(service_config, category)
+        
+        # Ensure platform compatibility for ARM hosts
+        if 'platform' not in service_config:
+            service_config['platform'] = 'linux/amd64'
         
         # Remap ports and get info
         service_port_info = _remap_service_ports(service_config)
@@ -100,8 +130,14 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
 def create_minimal_compose_file() -> Path:
     """Creates a compose file with only the agent service."""
     compose_data = {'services': {}}
-    _add_agent_service(compose_data)
     
+    ctfnet_subnet = _get_ctfnet_subnet()
+    _add_agent_service(compose_data, ctfnet_subnet)
+    
+    # Also specify platform for the minimal service
+    if 'default' in compose_data['services']:
+        compose_data['services']['default']['platform'] = 'linux/amd64'
+
     compose_data['networks'] = {
         nyuctf_config.NETWORK_NAME: {'external': True}
     }
@@ -114,26 +150,51 @@ def create_minimal_compose_file() -> Path:
     return temp_file
 
 
-def _add_agent_service(compose_data: dict) -> None:
+def _add_agent_service(compose_data: dict, ctfnet_subnet: Optional[str]) -> None:
     """Adds the agent service configuration to the compose data."""
     if 'services' not in compose_data:
         compose_data['services'] = {}
         
-    setup_script = network_utils.create_setup_script()
-    
+    # Add a specific firewall rule for the ctfnet subnet if found
+    ctfnet_rule = f"iptables -A OUTPUT -d {ctfnet_subnet} -j ACCEPT" if ctfnet_subnet else ""
+
+    # This command runs inside the container to set up the firewall and keep it alive.
+    setup_command = f"""bash -c '
+        cat << "LOCK" > /usr/local/bin/apply-nyuctf-lockdown
+#!/bin/bash
+iptables -F OUTPUT 2>/dev/null || true
+iptables -P OUTPUT DROP 2>/dev/null || true
+iptables -A OUTPUT -o lo -j ACCEPT
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+# Allow standard Docker bridge network
+iptables -A OUTPUT -d 172.16.0.0/12 -j ACCEPT
+# Dynamically add rule for the ctfnet network
+{ctfnet_rule}
+# Allow DNS
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+LOCK
+        chmod +x /usr/local/bin/apply-nyuctf-lockdown
+        /usr/local/bin/apply-nyuctf-lockdown
+        
+        export PATH="/usr/local/bin:$PATH"
+        mkdir -p /usr/local/bin
+        
+        printf "%s\\n" "#!/bin/bash" "iptables -P OUTPUT ACCEPT 2>/dev/null" "exec /usr/bin/apt-get \\"\\$@\\"" "/usr/local/bin/apply-nyuctf-lockdown" > /usr/local/bin/apt-get
+        chmod +x /usr/local/bin/apt-get
+        
+        while true; do sleep 3600; done
+    '"""
+
     compose_data['services']['default'] = {
         'image': nyuctf_config.AGENT_IMAGE,
+        'x-local': True,  # Ensures inspect_ai uses the local image, not pulls from a remote registry
+        'platform': 'linux/amd64', # Explicitly set platform for our agent on ARM hosts
         'init': True,
         'networks': [nyuctf_config.NETWORK_NAME],
         'privileged': True,
-        'cap_add': ['NET_ADMIN', 'SYS_PTRACE'], # SYS_PTRACE for some debug tools
-        'environment': {
-            'DEBIAN_FRONTEND': 'noninteractive',
-            'BASH_ENV': '/etc/profile.d/nyuctf_setup.sh'
-        },
-        'volumes': [
-            {'type': 'bind', 'source': str(setup_script), 'target': '/etc/profile.d/nyuctf_setup.sh', 'read_only': True},
-        ]
+        'cap_add': ['NET_ADMIN', 'SYS_PTRACE'],
+        'command': setup_command
     }
     
 def _add_network_alias(service_config: dict, category: Optional[str]) -> None:

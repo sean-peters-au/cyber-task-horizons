@@ -190,6 +190,7 @@ class InterCodeCTFBench(Bench):
                     inspect_task, 
                     retry_on_error=3,  # Retry failed samples up to 3 times
                     fail_on_error=0.1,  # Tolerate up to 10% sample failures
+                    max_connections=config.LLM_MAX_CONNECTIONS,
                     **eval_params
                 )
             except Exception as e:
