@@ -50,7 +50,6 @@ MODELS_3 = \
 	openai/gpt2-xl \
 	openai/gpt-3.5-turbo \
 	openai/o4-mini-2025-04-16 \
-	google/gemini-2.5-pro-20250605 \
 	anthropic/claude-3-5-sonnet-20241022 \
 	anthropic/claude-opus-4-20250514 \
 	openai/o3-2025-04-16 \
@@ -67,7 +66,7 @@ MODELS_PUBLICATION = \
 	anthropic/claude-3-5-sonnet-20241022 \
 	openai/o4-mini-2025-04-16 \
 	openai/o3-2025-04-16 \
-	google/gemini-2.5-pro-20250605
+	google/gemini-2.5-pro-preview-06-05
 
 # Phony targets
 .PHONY: all help datasets docs clean clean_datasets clean_benchmarks clean_docs test \
