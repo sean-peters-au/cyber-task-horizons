@@ -1,0 +1,10 @@
+{
+  "Total_Challenges": 50,
+  "Docker_Supported": 29,
+  "Docker_Percentage": 58.0,
+  "Challenge_Types": {
+    "static": 35,
+    "dynamic": 15
+  },
+  "Most_Common_Type": "static"
+}

@@ -1,0 +1,51 @@
+{
+  "dataset": "cybashbench",
+  "model": "openai/o4-mini-2025-04-16",
+  "alias": "openai/o4-mini-2025-04-16",
+  "timestamp": "2025-06-18T04:01:08.329269+00:00",
+  "stats": {
+    "total_tasks": 131,
+    "successful_tasks": 126,
+    "success_rate": 0.9618320610687023,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.9664122137404579,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.9618320610687023,
+    "complexity_breakdown": {
+      "very_simple": {
+        "total": 34,
+        "successful": 34,
+        "success_rate": 1.0,
+        "avg_score": 0.9941176470588234
+      },
+      "unknown": {
+        "total": 81,
+        "successful": 77,
+        "success_rate": 0.9506172839506173,
+        "avg_score": 0.9543209876543209
+      },
+      "simple": {
+        "total": 15,
+        "successful": 14,
+        "success_rate": 0.9333333333333333,
+        "avg_score": 0.9666666666666667
+      },
+      "medium": {
+        "total": 1,
+        "successful": 1,
+        "success_rate": 1.0,
+        "avg_score": 1.0
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 470.653821,
+    "num_tasks": 131,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/cybashbench/inspect_logs",
+    "is_local_model": false
+  }
+}

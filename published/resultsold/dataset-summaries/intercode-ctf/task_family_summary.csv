@@ -1,0 +1,6 @@
+task_family,num_tasks,successful_tasks,success_rate,human_minutes_min,human_minutes_max,mean_human_minutes,median_human_minutes,total_human_minutes,total_human_cost,mean_human_cost
+intercode-ctf_crypto,19,19,100.0,0.25,10.0,2.8,1.5,53.25,66.56,3.5
+intercode-ctf_general_skills,33,33,100.0,0.17,3.0,0.7,0.5,23.08,28.85,0.87
+intercode-ctf_pwn,4,4,100.0,1.0,5.0,2.62,2.25,10.5,13.12,3.28
+intercode-ctf_reverse,41,41,100.0,0.17,7.0,1.78,1.25,73.17,91.46,2.23
+intercode-ctf_web,2,2,100.0,0.33,1.0,0.67,0.67,1.33,1.67,0.83

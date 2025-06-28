@@ -1,0 +1,51 @@
+{
+  "dataset": "cybashbench",
+  "model": "anthropic/claude-3-5-sonnet-20240620",
+  "alias": "anthropic/claude-3-5-sonnet-20240620",
+  "timestamp": "2025-06-19T10:02:59.211388+00:00",
+  "stats": {
+    "total_tasks": 131,
+    "successful_tasks": 120,
+    "success_rate": 0.916030534351145,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.9450381679389313,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.916030534351145,
+    "complexity_breakdown": {
+      "very_simple": {
+        "total": 34,
+        "successful": 33,
+        "success_rate": 0.9705882352941176,
+        "avg_score": 0.9852941176470589
+      },
+      "unknown": {
+        "total": 81,
+        "successful": 73,
+        "success_rate": 0.9012345679012346,
+        "avg_score": 0.9296296296296296
+      },
+      "simple": {
+        "total": 15,
+        "successful": 13,
+        "success_rate": 0.8666666666666667,
+        "avg_score": 0.9333333333333333
+      },
+      "medium": {
+        "total": 1,
+        "successful": 1,
+        "success_rate": 1.0,
+        "avg_score": 1.0
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 538.91422,
+    "num_tasks": 131,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/cybashbench/inspect_logs",
+    "is_local_model": false
+  }
+}

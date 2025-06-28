@@ -1,0 +1,51 @@
+{
+  "dataset": "cybashbench",
+  "model": "openai/gpt2-xl",
+  "alias": "openai/gpt2-xl",
+  "timestamp": "2025-06-17T22:40:02.133727+00:00",
+  "stats": {
+    "total_tasks": 131,
+    "successful_tasks": 9,
+    "success_rate": 0.06870229007633588,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.07633587786259542,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.06870229007633588,
+    "complexity_breakdown": {
+      "very_simple": {
+        "total": 34,
+        "successful": 7,
+        "success_rate": 0.20588235294117646,
+        "avg_score": 0.20588235294117646
+      },
+      "unknown": {
+        "total": 81,
+        "successful": 2,
+        "success_rate": 0.024691358024691357,
+        "avg_score": 0.037037037037037035
+      },
+      "simple": {
+        "total": 15,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.0
+      },
+      "medium": {
+        "total": 1,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.0
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 810.789513,
+    "num_tasks": 131,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/cybashbench/inspect_logs",
+    "is_local_model": true
+  }
+}

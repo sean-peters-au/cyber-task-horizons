@@ -1,0 +1,57 @@
+{
+  "dataset": "nl2bash",
+  "model": "openai/davinci-002",
+  "alias": "openai/davinci-002",
+  "timestamp": "2025-06-21T07:25:37.042364+00:00",
+  "stats": {
+    "total_tasks": 136,
+    "successful_tasks": 29,
+    "success_rate": 0.21323529411764705,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.34852941176470587,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.21323529411764705,
+    "complexity_breakdown": {
+      "complex": {
+        "total": 15,
+        "successful": 2,
+        "success_rate": 0.13333333333333333,
+        "avg_score": 0.3
+      },
+      "medium": {
+        "total": 40,
+        "successful": 4,
+        "success_rate": 0.1,
+        "avg_score": 0.25
+      },
+      "simple": {
+        "total": 40,
+        "successful": 8,
+        "success_rate": 0.2,
+        "avg_score": 0.36249999999999993
+      },
+      "very_complex": {
+        "total": 1,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.0
+      },
+      "very_simple": {
+        "total": 40,
+        "successful": 15,
+        "success_rate": 0.375,
+        "avg_score": 0.45999999999999996
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 520.27413,
+    "num_tasks": 136,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/nl2bash/inspect_logs",
+    "is_local_model": true
+  }
+}

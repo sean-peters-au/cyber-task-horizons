@@ -1,0 +1,31 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "anthropic/claude-3-5-haiku-20241022",
+  "alias": "anthropic/claude-3-5-haiku-20241022",
+  "timestamp": "2025-06-18T02:41:00.615339+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 33,
+    "success_rate": 0.3333333333333333,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.3333333333333333,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.3333333333333333,
+    "category_breakdown": {
+      "unknown": {
+        "total": 99,
+        "solved": 33,
+        "solve_rate": 0.3333333333333333
+      }
+    },
+    "total_categories": 1
+  },
+  "metadata": {
+    "duration_seconds": 1265.712219,
+    "num_tasks": 99,
+    "inspect_ai_version": "0.3.89",
+    "docker_image": "intercode-ctf",
+    "max_turns": 15,
+    "is_local_model": false
+  }
+}

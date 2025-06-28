@@ -1,0 +1,7 @@
+task_family,num_tasks,successful_tasks,success_rate,human_minutes_min,human_minutes_max,mean_human_minutes,median_human_minutes,total_human_minutes,total_human_cost,mean_human_cost
+cybashbench_crypto,20,20,100.0,0.01,0.13,0.06,0.06,1.3,1.62,0.08
+cybashbench_forensics,23,23,100.0,0.01,0.25,0.06,0.05,1.46,1.83,0.08
+cybashbench_misc,24,24,100.0,0.01,0.08,0.04,0.03,0.89,1.11,0.05
+cybashbench_pwn,22,22,100.0,0.01,0.09,0.04,0.04,0.9,1.12,0.05
+cybashbench_reverse,19,19,100.0,0.01,0.13,0.05,0.05,1.04,1.3,0.07
+cybashbench_web,23,23,100.0,0.02,0.2,0.06,0.05,1.46,1.82,0.08

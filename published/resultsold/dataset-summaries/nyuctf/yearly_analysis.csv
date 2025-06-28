@@ -1,0 +1,11 @@
+Year,Total_Challenges,Categories,Num_Categories,Finals_Challenges,Quals_Challenges,Most_Common_Category
+2013,4,"misc(1), web(1), crypto(2)",3,1,3,crypto
+2015,4,"forensics(1), crypto(1), web(1), pwn(1)",4,1,3,forensics
+2016,5,"crypto(1), forensics(1), rev(1), web(1), pwn(1)",5,1,4,crypto
+2017,5,"pwn(2), misc(1), rev(2)",3,2,3,pwn
+2018,4,"misc(1), rev(1), pwn(1), crypto(1)",4,0,4,misc
+2019,4,"rev(1), crypto(3)",2,1,3,crypto
+2020,5,"rev(2), pwn(2), web(1)",3,2,3,rev
+2021,8,"pwn(1), rev(2), forensics(1), crypto(3), web(1)",5,3,5,crypto
+2022,6,"crypto(4), pwn(1), misc(1)",3,4,2,crypto
+2023,5,"rev(1), pwn(2), misc(1), web(1)",4,1,4,pwn

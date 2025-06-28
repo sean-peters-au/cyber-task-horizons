@@ -1,0 +1,7 @@
+Competition,Total_Challenges,Percentage,Categories,Num_Categories
+HackTheBox,17,42.5,"reverse engineering(4), cryptography(4), forensics(3), web(3), misc(2), pwn(1)",6
+Glacier,8,20.0,"cryptography(4), reverse engineering(2), misc(1), web(1)",4
+Sekai-2023,8,20.0,"cryptography(3), web(2), forensics(1), misc(1), pwn(1)",5
+Sekai-2022,4,10.0,cryptography(4),1
+HKCert,2,5.0,web(2),1
+GCTF-2023,1,2.5,cryptography(1),1

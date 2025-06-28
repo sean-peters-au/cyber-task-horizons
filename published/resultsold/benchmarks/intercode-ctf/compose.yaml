@@ -1,0 +1,12 @@
+services:
+  default:
+    image: intercode-ctf
+    x-local: true
+    init: true
+    command: tail -f /dev/null
+    working_dir: /ctf
+    cpus: 0.5
+    mem_limit: 512mb
+    restart: "no"
+    stop_grace_period: 10s
+    network_mode: host

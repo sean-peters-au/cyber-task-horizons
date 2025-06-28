@@ -1,0 +1,31 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "openai/gpt-3.5-turbo",
+  "alias": "openai/gpt-3.5-turbo",
+  "timestamp": "2025-06-18T00:17:50.156424+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 7,
+    "success_rate": 0.0707070707070707,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.0707070707070707,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.0707070707070707,
+    "category_breakdown": {
+      "unknown": {
+        "total": 99,
+        "solved": 7,
+        "solve_rate": 0.0707070707070707
+      }
+    },
+    "total_categories": 1
+  },
+  "metadata": {
+    "duration_seconds": 1651.960064,
+    "num_tasks": 99,
+    "inspect_ai_version": "0.3.89",
+    "docker_image": "intercode-ctf",
+    "max_turns": 15,
+    "is_local_model": false
+  }
+}

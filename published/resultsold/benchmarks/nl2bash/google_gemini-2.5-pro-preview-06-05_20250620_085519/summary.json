@@ -1,0 +1,57 @@
+{
+  "dataset": "nl2bash",
+  "model": "google/gemini-2.5-pro-preview-06-05",
+  "alias": "google/gemini-2.5-pro-preview-06-05",
+  "timestamp": "2025-06-19T22:41:08.897233+00:00",
+  "stats": {
+    "total_tasks": 136,
+    "successful_tasks": 111,
+    "success_rate": 0.8161764705882353,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.8669117647058825,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.8161764705882353,
+    "complexity_breakdown": {
+      "complex": {
+        "total": 15,
+        "successful": 13,
+        "success_rate": 0.8666666666666667,
+        "avg_score": 0.9
+      },
+      "medium": {
+        "total": 40,
+        "successful": 30,
+        "success_rate": 0.75,
+        "avg_score": 0.8275000000000002
+      },
+      "simple": {
+        "total": 40,
+        "successful": 31,
+        "success_rate": 0.775,
+        "avg_score": 0.8375
+      },
+      "very_complex": {
+        "total": 1,
+        "successful": 1,
+        "success_rate": 1.0,
+        "avg_score": 1.0
+      },
+      "very_simple": {
+        "total": 40,
+        "successful": 36,
+        "success_rate": 0.9,
+        "avg_score": 0.9199999999999999
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 850.776793,
+    "num_tasks": 136,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/nl2bash/inspect_logs",
+    "is_local_model": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "openai/o3-2025-04-16",
+  "alias": "openai/o3-2025-04-16",
+  "timestamp": "2025-06-21T09:28:45.662491+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 65,
+    "success_rate": 0.6565656565656566,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.6565656565656566,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.6565656565656566,
+    "category_breakdown": {
+      "unknown": {
+        "total": 99,
+        "solved": 65,
+        "solve_rate": 0.6565656565656566
+      }
+    },
+    "total_categories": 1
+  },
+  "metadata": {
+    "duration_seconds": 1745.61404,
+    "num_tasks": 99,
+    "inspect_ai_version": "0.3.89",
+    "docker_image": "intercode-ctf",
+    "max_turns": 15,
+    "is_local_model": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "anthropic/claude-3-5-sonnet-20241022",
+  "alias": "anthropic/claude-3-5-sonnet-20241022",
+  "timestamp": "2025-06-21T12:04:47.360861+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 73,
+    "success_rate": 0.7373737373737373,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.7373737373737373,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.7373737373737373,
+    "category_breakdown": {
+      "unknown": {
+        "total": 99,
+        "solved": 73,
+        "solve_rate": 0.7373737373737373
+      }
+    },
+    "total_categories": 1
+  },
+  "metadata": {
+    "duration_seconds": 2311.895305,
+    "num_tasks": 99,
+    "inspect_ai_version": "0.3.89",
+    "docker_image": "intercode-ctf",
+    "max_turns": 15,
+    "is_local_model": false
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "dataset": "nl2bash",
+  "model": "anthropic/claude-3-5-sonnet-20240620",
+  "alias": "anthropic/claude-3-5-sonnet-20240620",
+  "timestamp": "2025-06-19T10:19:24.372507+00:00",
+  "stats": {
+    "total_tasks": 136,
+    "successful_tasks": 93,
+    "success_rate": 0.6838235294117647,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.7588235294117648,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.6838235294117647,
+    "complexity_breakdown": {
+      "complex": {
+        "total": 15,
+        "successful": 11,
+        "success_rate": 0.7333333333333333,
+        "avg_score": 0.7933333333333333
+      },
+      "medium": {
+        "total": 40,
+        "successful": 25,
+        "success_rate": 0.625,
+        "avg_score": 0.7074999999999999
+      },
+      "simple": {
+        "total": 40,
+        "successful": 27,
+        "success_rate": 0.675,
+        "avg_score": 0.76
+      },
+      "very_complex": {
+        "total": 1,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.2
+      },
+      "very_simple": {
+        "total": 40,
+        "successful": 30,
+        "success_rate": 0.75,
+        "avg_score": 0.8099999999999999
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 781.80681,
+    "num_tasks": 136,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/nl2bash/inspect_logs",
+    "is_local_model": false
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "dataset": "nl2bash",
+  "model": "anthropic/claude-3-5-haiku-20241022",
+  "alias": "anthropic/claude-3-5-haiku-20241022",
+  "timestamp": "2025-06-18T02:26:51.197987+00:00",
+  "stats": {
+    "total_tasks": 136,
+    "successful_tasks": 83,
+    "success_rate": 0.6102941176470589,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.7102941176470589,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.6102941176470589,
+    "complexity_breakdown": {
+      "complex": {
+        "total": 15,
+        "successful": 8,
+        "success_rate": 0.5333333333333333,
+        "avg_score": 0.66
+      },
+      "medium": {
+        "total": 40,
+        "successful": 23,
+        "success_rate": 0.575,
+        "avg_score": 0.6725
+      },
+      "simple": {
+        "total": 40,
+        "successful": 22,
+        "success_rate": 0.55,
+        "avg_score": 0.6649999999999999
+      },
+      "very_complex": {
+        "total": 1,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.2
+      },
+      "very_simple": {
+        "total": 40,
+        "successful": 30,
+        "success_rate": 0.75,
+        "avg_score": 0.825
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 841.029704,
+    "num_tasks": 136,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/nl2bash/inspect_logs",
+    "is_local_model": false
+  }
+}

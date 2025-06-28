@@ -1,0 +1,8 @@
+Time_Horizon_Hours,Time_Horizon_Minutes,Tasks_Solvable,Percentage_Solvable,Categories
+0.5,30,16,40.0,"cryptography(5), web(4), reverse engineering(3), forensics(3), misc(1)"
+1.0,60,24,60.0,"cryptography(8), web(5), reverse engineering(5), forensics(3), pwn(2), misc(1)"
+2.0,120,30,75.0,"cryptography(10), web(6), reverse engineering(5), forensics(4), misc(3), pwn(2)"
+4.0,240,34,85.0,"cryptography(13), web(7), reverse engineering(5), forensics(4), misc(3), pwn(2)"
+8.0,480,39,97.5,"cryptography(15), web(8), reverse engineering(6), misc(4), forensics(4), pwn(2)"
+16.0,960,39,97.5,"cryptography(15), web(8), reverse engineering(6), misc(4), forensics(4), pwn(2)"
+24.0,1440,39,97.5,"cryptography(15), web(8), reverse engineering(6), misc(4), forensics(4), pwn(2)"

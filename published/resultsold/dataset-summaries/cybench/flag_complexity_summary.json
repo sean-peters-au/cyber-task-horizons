@@ -1,0 +1,8 @@
+{
+  "Average_Flag_Length": 47.3,
+  "Min_Flag_Length": 20,
+  "Max_Flag_Length": 124,
+  "Flags_With_Special_Chars": 40,
+  "Unique_Flag_Prefixes": 4,
+  "Most_Common_Prefixes": "HTB(17), SEKAI(12), gctf(9), hkcert22(2)"
+}
