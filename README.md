@@ -7,6 +7,9 @@ Evaluating modern LLMs on **offensive-cybersecurity** tasks with METR-style time
 <p align="center">
   <img src="data/keep/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
 </p>
+<p align="center">
+  <img src="published/plots/individual_histograms/individual_histograms.png" width="90%" alt="Individual Model Histograms"/>
+</p>
 
 > **Key result** State-of-the-art models' 50 % success horizon doubles roughly every **5 months**. Today's best models solve **15-minute** CTF tasks half the time.
 
