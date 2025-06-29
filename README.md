@@ -1,6 +1,5 @@
 # Cyber Task Horizons
 
-
 A recent [METR paper](https://arxiv.org/pdf/2503.14499) showed that the length of software engineering tasks that LLMs could successfully complete appeared to be doubling roughly every seven months. I asked the same question for offensive cybersecurity, a domain with distinct skills and unique AI-safety implications.
 
 Using METR's methodology on five cyber benchmarks, with tasks ranging from 0.5s to 25h in human-expert estimated times, I evaluated many state of the art model releases over the past 5 years. I found:
