@@ -448,12 +448,15 @@ class Bench(ABC):
     def extract_completed_task_ids(self, eval_log_path: Path) -> Set[str]:
         """
         Extract completed task IDs from an inspect .eval log file.
+        A task is considered "completed" if it either succeeded OR failed legitimately
+        (i.e., the model got a chance to try but gave the wrong answer).
+        Tasks with technical errors will be excluded so they can be re-run during resume.
         
         Args:
             eval_log_path: Path to the .eval log file
             
         Returns:
-            Set of completed task IDs
+            Set of completed task IDs (successful or legitimately failed, but not errored)
         """
         completed_tasks = set()
         
@@ -461,8 +464,26 @@ class Bench(ABC):
             # Pass path as a string to be safe
             log = read_eval_log(str(eval_log_path))
             for sample in log.samples:
-                completed_tasks.add(sample.id)
-            logger.info(f"Found {len(completed_tasks)} completed tasks in {eval_log_path}")
+                # Check if this sample had a technical error
+                has_error = False
+                if hasattr(sample, 'error') and sample.error:
+                    has_error = True
+                elif hasattr(sample, 'messages') and sample.messages:
+                    # Check if the last message indicates an error
+                    last_message = sample.messages[-1] if sample.messages else None
+                    if last_message and hasattr(last_message, 'role') and last_message.role == 'error':
+                        has_error = True
+                
+                # If there was a technical error, don't mark as completed (so it gets re-run)
+                if has_error:
+                    continue
+                
+                # If no error, check if we have a valid score (success or legitimate failure)
+                score_cont, score_binarized = self._extract_score_from_sample(sample)
+                if sample.scores:  # Has some kind of score, whether success or failure
+                    completed_tasks.add(sample.id)
+                    
+            logger.info(f"Found {len(completed_tasks)} completed tasks (successful or legitimately failed) in {eval_log_path}")
             
         except Exception as e:
             logger.error(f"Error reading eval log {eval_log_path} with inspect_ai: {e}")
