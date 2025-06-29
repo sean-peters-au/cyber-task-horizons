@@ -1,0 +1,51 @@
+{
+  "dataset": "cybashbench",
+  "model": "google/gemini-2.5-pro-preview-06-05",
+  "alias": "google/gemini-2.5-pro-preview-06-05",
+  "timestamp": "2025-06-28T13:50:02.252290+00:00",
+  "stats": {
+    "total_tasks": 200,
+    "successful_tasks": 177,
+    "success_rate": 0.885,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.899,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.885,
+    "complexity_breakdown": {
+      "unknown": {
+        "total": 73,
+        "successful": 61,
+        "success_rate": 0.8356164383561644,
+        "avg_score": 0.8534246575342466
+      },
+      "very_simple": {
+        "total": 112,
+        "successful": 106,
+        "success_rate": 0.9464285714285714,
+        "avg_score": 0.9464285714285714
+      },
+      "simple": {
+        "total": 14,
+        "successful": 10,
+        "success_rate": 0.7142857142857143,
+        "avg_score": 0.8214285714285714
+      },
+      "medium": {
+        "total": 1,
+        "successful": 0,
+        "success_rate": 0.0,
+        "avg_score": 0.0
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 538.257754,
+    "num_tasks": 200,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/cybashbench/inspect_logs",
+    "is_local_model": false
+  }
+}

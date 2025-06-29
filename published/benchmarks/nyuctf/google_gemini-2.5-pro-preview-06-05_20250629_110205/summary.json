@@ -1,0 +1,91 @@
+{
+  "dataset": "nyuctf",
+  "model": "google/gemini-2.5-pro-preview-06-05",
+  "alias": "google/gemini-2.5-pro-preview-06-05",
+  "timestamp": "2025-06-28T14:10:49.485594+00:00",
+  "stats": {
+    "total_tasks": 18,
+    "successful_tasks": 6,
+    "success_rate": 0.3333333333333333,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.3333333333333333,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.3333333333333333,
+    "category_breakdown": {
+      "crypto": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "misc": {
+        "total": 2,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "web": {
+        "total": 3,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "forensics": {
+        "total": 3,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "rev": {
+        "total": 3,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "pwn": {
+        "total": 2,
+        "solved": 0,
+        "solve_rate": 0.0
+      }
+    },
+    "year_breakdown": {
+      "2013": {
+        "total": 3,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2015": {
+        "total": 4,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2016": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2021": {
+        "total": 6,
+        "solved": 0,
+        "solve_rate": 0.0
+      }
+    },
+    "event_breakdown": {
+      "CSAW-Finals": {
+        "total": 4,
+        "solved": 1,
+        "solve_rate": 0.25
+      },
+      "CSAW-Quals": {
+        "total": 14,
+        "solved": 5,
+        "solve_rate": 0.35714285714285715
+      }
+    }
+  },
+  "metadata": {
+    "duration_seconds": 39076.406015,
+    "num_tasks": 50,
+    "inspect_ai_version": "0.3.89",
+    "max_messages": 50,
+    "is_local_model": false,
+    "resumed": false,
+    "num_completed_from_previous": 0,
+    "num_new_completions": 18
+  }
+}

@@ -1,6 +1,0 @@
-task_family,num_tasks,successful_tasks,success_rate,human_minutes_min,human_minutes_max,mean_human_minutes,median_human_minutes,total_human_minutes,total_human_cost,mean_human_cost
-nl2bash_complex,15,15,100.0,0.17,3.33,1.06,0.67,15.83,19.79,1.32
-nl2bash_medium,40,40,100.0,0.07,3.0,0.72,0.5,28.75,35.94,0.9
-nl2bash_simple,40,40,100.0,0.08,0.75,0.35,0.33,13.9,17.38,0.43
-nl2bash_very_complex,1,1,100.0,4.0,4.0,4.0,4.0,4.0,5.0,5.0
-nl2bash_very_simple,40,40,100.0,0.07,0.33,0.16,0.17,6.58,8.23,0.21

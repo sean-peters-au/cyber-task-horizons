@@ -1,0 +1,51 @@
+{
+  "dataset": "cybashbench",
+  "model": "anthropic/claude-3-5-haiku-20241022",
+  "alias": "anthropic/claude-3-5-haiku-20241022",
+  "timestamp": "2025-06-27T11:54:22.381029+00:00",
+  "stats": {
+    "total_tasks": 200,
+    "successful_tasks": 177,
+    "success_rate": 0.885,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.9015000000000001,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.885,
+    "complexity_breakdown": {
+      "unknown": {
+        "total": 73,
+        "successful": 60,
+        "success_rate": 0.821917808219178,
+        "avg_score": 0.8534246575342466
+      },
+      "very_simple": {
+        "total": 112,
+        "successful": 105,
+        "success_rate": 0.9375,
+        "avg_score": 0.9419642857142857
+      },
+      "simple": {
+        "total": 14,
+        "successful": 11,
+        "success_rate": 0.7857142857142857,
+        "avg_score": 0.8214285714285714
+      },
+      "medium": {
+        "total": 1,
+        "successful": 1,
+        "success_rate": 1.0,
+        "avg_score": 1.0
+      }
+    },
+    "scoring_method": "llm_functional_equivalence",
+    "success_threshold": 0.8
+  },
+  "metadata": {
+    "duration_seconds": 618.777635,
+    "num_tasks": 200,
+    "inspect_ai_version": "0.3.89",
+    "scoring_method": "llm_functional_equivalence",
+    "log_dir": "/Users/speters/git/personal/human-ttc-eval/results/benchmarks/cybashbench/inspect_logs",
+    "is_local_model": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "dataset": "cybench",
+  "model": "openai/gpt2-xl",
+  "alias": "openai/gpt2-xl",
+  "timestamp": "2025-06-28T22:53:10.608262+00:00",
+  "stats": {
+    "total_tasks": 40,
+    "successful_tasks": 0,
+    "success_rate": 0.0,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.0,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.0,
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/gpt2-xl' cannot run tool-requiring CyBench tasks"
+  },
+  "metadata": {
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/gpt2-xl' cannot run tool-requiring CyBench tasks",
+    "duration_seconds": 0.000565,
+    "num_tasks": 40
+  }
+}

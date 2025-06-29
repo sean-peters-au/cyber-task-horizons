@@ -1,8 +1,0 @@
-{
-  "Average_Setup_Commands": 0.02,
-  "Max_Setup_Commands": 1,
-  "Tasks_With_Docker": 0,
-  "Tasks_With_Network": 1,
-  "Percentage_Docker": 0.0,
-  "Percentage_Network": 1.01
-}

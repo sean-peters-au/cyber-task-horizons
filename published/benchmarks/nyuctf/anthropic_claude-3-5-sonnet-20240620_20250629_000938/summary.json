@@ -1,0 +1,121 @@
+{
+  "dataset": "nyuctf",
+  "model": "anthropic/claude-3-5-sonnet-20240620",
+  "alias": "anthropic/claude-3-5-sonnet-20240620",
+  "timestamp": "2025-06-28T13:49:00.333011+00:00",
+  "stats": {
+    "total_tasks": 51,
+    "successful_tasks": 10,
+    "success_rate": 0.19607843137254902,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.19607843137254902,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.19607843137254902,
+    "category_breakdown": {
+      "crypto": {
+        "total": 15,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "misc": {
+        "total": 8,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "web": {
+        "total": 6,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "forensics": {
+        "total": 4,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "rev": {
+        "total": 10,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "pwn": {
+        "total": 8,
+        "solved": 0,
+        "solve_rate": 0.0
+      }
+    },
+    "year_breakdown": {
+      "2019": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2013": {
+        "total": 3,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2015": {
+        "total": 4,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2016": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2017": {
+        "total": 7,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2018": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2020": {
+        "total": 7,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2021": {
+        "total": 6,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2022": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "2023": {
+        "total": 4,
+        "solved": 0,
+        "solve_rate": 0.0
+      }
+    },
+    "event_breakdown": {
+      "CSAW-Finals": {
+        "total": 12,
+        "solved": 1,
+        "solve_rate": 0.08333333333333333
+      },
+      "CSAW-Quals": {
+        "total": 39,
+        "solved": 9,
+        "solve_rate": 0.23076923076923078
+      }
+    }
+  },
+  "metadata": {
+    "duration_seconds": 1237.903705,
+    "num_tasks": 4,
+    "inspect_ai_version": "0.3.89",
+    "max_messages": 50,
+    "is_local_model": false,
+    "resumed": true,
+    "num_completed_from_previous": 50,
+    "num_new_completions": 1
+  }
+}

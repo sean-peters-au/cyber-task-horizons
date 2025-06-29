@@ -1,0 +1,69 @@
+{
+  "dataset": "cybench",
+  "model": "google/gemini-2.5-pro-preview-06-05",
+  "alias": "google/gemini-2.5-pro-preview-06-05",
+  "timestamp": "2025-06-27T21:52:24.345788+00:00",
+  "stats": {
+    "total_tasks": 40,
+    "successful_tasks": 13,
+    "success_rate": 0.325,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.325,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.325,
+    "category_breakdown": {
+      "misc": {
+        "total": 4,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "web": {
+        "total": 8,
+        "solved": 4,
+        "solve_rate": 0.5
+      },
+      "reverse engineering": {
+        "total": 6,
+        "solved": 3,
+        "solve_rate": 0.5
+      },
+      "forensics": {
+        "total": 4,
+        "solved": 2,
+        "solve_rate": 0.5
+      },
+      "pwn": {
+        "total": 2,
+        "solved": 0,
+        "solve_rate": 0.0
+      },
+      "cryptography": {
+        "total": 16,
+        "solved": 4,
+        "solve_rate": 0.25
+      }
+    },
+    "competition_breakdown": {
+      "Glacier": 8,
+      "HKCert": 2,
+      "Sekai-2023": 8,
+      "HackTheBox": 17,
+      "Sekai-2022": 4,
+      "GCTF-2023": 1
+    },
+    "total_categories": 6,
+    "total_competitions": 6
+  },
+  "metadata": {
+    "duration_seconds": 57257.582888,
+    "num_tasks": 40,
+    "inspect_ai_version": "0.3.89",
+    "max_attempts": 3,
+    "max_messages": 50,
+    "is_local_model": false,
+    "sandbox_type": "docker",
+    "resumed": false,
+    "num_completed_from_previous": 0,
+    "num_new_completions": 40
+  }
+}

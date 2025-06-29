@@ -1,0 +1,31 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "google/gemini-2.5-pro-preview-06-05",
+  "alias": "google/gemini-2.5-pro-preview-06-05",
+  "timestamp": "2025-06-27T11:49:41.061296+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 77,
+    "success_rate": 0.7777777777777778,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.7777777777777778,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.7777777777777778,
+    "category_breakdown": {
+      "unknown": {
+        "total": 99,
+        "solved": 77,
+        "solve_rate": 0.7777777777777778
+      }
+    },
+    "total_categories": 1
+  },
+  "metadata": {
+    "duration_seconds": 24743.374569,
+    "num_tasks": 99,
+    "inspect_ai_version": "0.3.89",
+    "docker_image": "intercode-ctf",
+    "max_turns": 15,
+    "is_local_model": false
+  }
+}

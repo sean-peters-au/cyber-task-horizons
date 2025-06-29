@@ -1,0 +1,23 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "openai/davinci-002",
+  "alias": "openai/davinci-002",
+  "timestamp": "2025-06-27T21:50:48.391935+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 0,
+    "success_rate": 0.0,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.0,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.0,
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/davinci-002' cannot run tool-requiring InterCode-CTF tasks"
+  },
+  "metadata": {
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/davinci-002' cannot run tool-requiring InterCode-CTF tasks",
+    "duration_seconds": 0.001844,
+    "num_tasks": 99
+  }
+}

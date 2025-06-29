@@ -1,0 +1,23 @@
+{
+  "dataset": "intercode-ctf",
+  "model": "openai/gpt2-xl",
+  "alias": "openai/gpt2-xl",
+  "timestamp": "2025-06-27T22:08:21.102937+00:00",
+  "stats": {
+    "total_tasks": 99,
+    "successful_tasks": 0,
+    "success_rate": 0.0,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.0,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.0,
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/gpt2-xl' cannot run tool-requiring InterCode-CTF tasks"
+  },
+  "metadata": {
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/gpt2-xl' cannot run tool-requiring InterCode-CTF tasks",
+    "duration_seconds": 0.001701,
+    "num_tasks": 99
+  }
+}
