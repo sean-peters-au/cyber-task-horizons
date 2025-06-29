@@ -1,6 +1,5 @@
 # Cyber Task Horizons
 
-**[Read the full report here](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**
 
 A recent [METR paper](https://arxiv.org/pdf/2503.14499) showed that the length of software engineering tasks that LLMs could successfully complete appeared to be doubling roughly every seven months. I asked the same question for offensive cybersecurity, a domain with distinct skills and unique AI-safety implications.
 
@@ -9,6 +8,8 @@ Using METR's methodology on five cyber benchmarks, with tasks ranging from 0.5s 
 2. The best current models solve 15-minute tasks with a 50% success rate.
 
 All code artifacts, evaluation logs, and results are available in this repository.
+
+**[You can read the full report on this work here.](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**
 
 <p align="center">
   <img src="published/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
