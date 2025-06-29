@@ -5,7 +5,7 @@
 Evaluating modern LLMs on **offensive-cybersecurity** tasks with METR-style time-horizon analysis.
 
 <p align="center">
-  <img src="data/keep/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
+  <img src="published/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
 </p>
 <p align="center">
   <img src="published/plots/individual_histograms/individual_histograms.png" width="90%" alt="Individual Model Histograms"/>
