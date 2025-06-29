@@ -52,8 +52,7 @@ Human task times are anchored by first-blood logs (CyBench) or estimates cross-c
 3. Fit a 2-PL logistic curve (ability vs log₂(time)).
 4. Extract P(50) horizons and plot vs model release date.
 
-
-Full details: [`docs/blog.md`](docs/blog.md) / [`docs/methodology.md`](docs/methodology.md)
+You can read the full report on this work **[here](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**.
 
 ---
 
