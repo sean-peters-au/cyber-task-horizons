@@ -8,7 +8,7 @@ Using METR's methodology on five cyber benchmarks, with tasks ranging from 0.5s 
 
 All code artifacts, evaluation logs, and results are available in this repository.
 
-**[You can read the full report on this work here.](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**
+You can read the full report on this work **[here](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**.
 
 <p align="center">
   <img src="published/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
