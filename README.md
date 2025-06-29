@@ -2,7 +2,13 @@
 
 **[Read the full report here](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**
 
-Evaluating modern LLMs on **offensive-cybersecurity** tasks with METR-style time-horizon analysis.
+A recent [METR paper](https://arxiv.org/pdf/2503.14499) showed that the length of software engineering tasks that LLMs could successfully complete appeared to be doubling roughly every seven months. I asked the same question for offensive cybersecurity, a domain with distinct skills and unique AI-safety implications.
+
+Using METR's methodology on five cyber benchmarks, with tasks ranging from 0.5s to 25h in human-expert estimated times, I evaluated many state of the art model releases over the past 5 years. I found:
+1. Cyber task horizons are doubling every ~5 months.
+2. The best current models solve 15-minute tasks with a 50% success rate.
+
+All code artifacts, evaluation logs, and results are available in this repository.
 
 <p align="center">
   <img src="published/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
@@ -10,8 +16,6 @@ Evaluating modern LLMs on **offensive-cybersecurity** tasks with METR-style time
 <p align="center">
   <img src="published/plots/individual_histograms/individual_histograms.png" width="90%" alt="Individual Model Histograms"/>
 </p>
-
-> **Key result** State-of-the-art models' 50 % success horizon doubles roughly every **5 months**. Today's best models solve **15-minute** CTF tasks half the time.
 
 ---
 
