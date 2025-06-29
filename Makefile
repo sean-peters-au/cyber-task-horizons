@@ -16,10 +16,11 @@ DATASETS = cybench nl2bash intercode-ctf cybashbench nyuctf
 
 # Repositories to clone
 THIRD_PARTY_REPOS = \
-    https://github.com/METR/eval-analysis-public.git \
+    https://github.com/sean-peters-au/eval-analysis-public.git \
+    https://github.com/sean-peters-au/inspect_evals.git \
     https://github.com/princeton-nlp/intercode.git \
     https://github.com/andyzorigin/cybench.git \
-    https://github.com/NYU-LLM-CTF/NYU_CTF_Bench.git \
+    https://github.com/sean-peters-au/NYU_CTF_Bench.git \
     https://github.com/TellinaTool/nl2bash.git
 
 # Custom Docker image
