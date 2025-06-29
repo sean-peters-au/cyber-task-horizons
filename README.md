@@ -1,68 +1,78 @@
 # Cyber Task Horizons
 
-A cybersecurity AI evaluation framework implementing [METR's time horizon analysis](https://arxiv.org/abs/2503.14499) across 5 datasets spanning 0.6 seconds to 25 hours of expert completion time.
+**[Read the full report here](https://sean-peters-au.github.io/2025/06/18/ai-task-length-horizons-in-offensive-cybersecurity.html)**
 
-## Results
+Evaluating modern LLMs on **offensive-cybersecurity** tasks with METR-style time-horizon analysis.
 
-### AI Capability Progression Across Time Horizons
-![Horizon Plot](data/keep/plots/horizon_plot_p50.png)
+<p align="center">
+  <img src="data/keep/plots/horizon_plot_p50.png" width="70%" alt="Time-horizon trend"/>
+</p>
 
-<div align="center">
-  <img src="data/keep/plots/task_length_distribution.png" width="45%" alt="Task Distribution">
-  <img src="data/keep/plots/individual_histograms.png" width="45%" alt="Dataset Histograms">
-</div>
+> **Key result** State-of-the-art models' 50 % success horizon doubles roughly every **5 months**. Today's best models solve **15-minute** CTF tasks half the time.
 
-## Overview
+---
 
-This framework evaluates AI models on cybersecurity tasks using [METR's time horizon methodology](https://arxiv.org/abs/2503.14499). By plotting AI success rates against increasing task complexity (measured by expert completion time), we can visualize capability progression and identify critical threshold crossings.
+## What's in this repo?
 
-This is a personal learning and research project aimed at understanding AI cybersecurity capabilities across different time horizons, reproducing METR's methodology in the cybersecurity domain, and exploring capability thresholds that may indicate concerning AI progress.
+| Folder | Purpose |
+|--------|---------|
+| `src/human_ttc_eval` | Benchmark harness & dataset adapters |
+| `scripts` | Additional utility scripts |
+| `data/keep` | dataset artefacts checked into git |
+| `published/` | Evaluation logs, results and plots |
+| `docs/` | Benchmark and code documentation |
 
-**Key Features:**
-- **5 Cybersecurity Datasets**: Command reflexes to professional CTF challenges
-- **Time Horizon Analysis**: 0.6s to 25h expert completion times
-- **METR-Compatible**: Direct integration with METR's analysis tools
-- **Sandboxed Evaluation**: Docker-based secure environments
-- **Horizon Curves**: Capability progression visualization
-
-## Quick Start
-
-```bash
-# Setup
-curl -fsSL https://get.uv.dev | bash
-uv sync
-cp .env.template .env  # Add your API keys
-make third-party
-
-# Start local model server
-make start-local-model-server MODEL=openai/gpt2-xl
-
-# Run evaluation (in new terminal)
-make repro TIER=1
-```
-
-See [Usage Guide](docs/usage.md) for detailed instructions.
+---
 
 ## Datasets
 
-| Dataset | Tasks | Time Range | Source | Description |
-|---------|-------|------------|---------|-------------|
-| **CyBashBench** | 131 | 0.6s-15s | Author-created | Cybersecurity command reflexes |
-| **NL2Bash** | 136 | 4s-4min | [TellinaTool](https://arxiv.org/abs/1802.08979) | Natural language to bash translation |
-| **InterCode-CTF** | 99 | 10s-10min | [InterCode](https://arxiv.org/abs/2306.14898) | Interactive CTF challenges |
-| **NYUCTF** | 50 | 2min-6h | [NYU CTF Dataset](https://arxiv.org/abs/2406.05590) | University competition challenges |
-| **CyBench** | 40 | 2min-25h | [CyBench](https://arxiv.org/abs/2408.08926) | Professional CTF challenges |
+| Dataset | Tasks | Time Range | Description |
+|---------|-------|-----------|-------------|
+| **CyBashBench** | 200 | 1 s – 30 s | High-frequency terminal reflexes (author-created) |
+| **NL2Bash** | 162 | 4 s – 4 min | Natural-language → bash (Tellina corpus) |
+| **InterCode-CTF** | 100 | 10 s – 10 min | Interactive PicoCTF-style problems |
+| **NYUCTF** | 50 | 2 min – 6 h | CSAW challenges 2011-23 (dockerised) |
+| **CyBench** | 40 | 2 min – 25 h | Recent pro-level CTF tasks (first-blood timings) |
 
-## Documentation
+Human task times are anchored by first-blood logs (CyBench) or estimates cross-checked with AI assistance.
 
-- **[Quick Start](docs/usage.md)** - Get up and running quickly
-- **[Methodology](docs/methodology.md)** - METR integration and evaluation approach
-- **[Datasets](docs/datasets.md)** - Comprehensive dataset overview
-- **[Architecture](docs/architecture.md)** - Technical implementation details
+---
 
-Individual dataset documentation:
-[CyBashBench](docs/cybashbench.md) | [NL2Bash](docs/nl2bash.md) | [InterCode-CTF](docs/intercode_ctf.md) | [NYUCTF](docs/nyuctf.md) | [CyBench](docs/cybench.md)
+## Methodology (1-min version)
 
-## Important Limitations
+1. **Estimate human time** for each task.
+2. Run each model once per task inside a locked-down Docker sandbox (tool-call budgets: 15 / 25 / 25).
+3. Fit a 2-PL logistic curve (ability vs log₂(time)).
+4. Extract P(50) horizons and plot vs model release date.
 
-**Human Baselines**: Most human timing data are AI-assisted estimates rather than empirical measurements. Only CyBench uses real competition data (with timing contamination issues). See [Methodology](docs/methodology.md) for details.
+
+Full details: [`docs/blog.md`](docs/blog.md) / [`docs/methodology.md`](docs/methodology.md)
+
+---
+
+## Quick start
+
+```bash
+# install dependencies
+curl -fsSL https://get.uv.dev | bash
+uv sync                 
+
+# add API keys (OpenAI, Anthropic, Google)
+cp .env.template .env  
+
+# clone third-party repos
+make third-party
+
+# For GPT2 and GPT3
+make start-local-model-servers
+
+# run fast tier (cheap models, 1 run each)
+make repro TIER=1
+
+# generate plots
+make plot
+```
+
+---
+
+**Feedback welcome!** Open an issue or reach out on GitHub if you have suggestions or spot errors.
