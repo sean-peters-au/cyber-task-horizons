@@ -1,5 +1,7 @@
 # Technical Architecture
 
+> **Note**: This document was primarily created for prompting code assistance tools during development, but should be useful for humans wanting a quick rundown of the codebase architecture and implementation patterns. The content is AI-generated in its entirety.
+
 ## Design Philosophy
 
 ### Core Principles
@@ -33,7 +35,7 @@ Raw Data → [Retrieve] → [Prepare] → [Describe] → [Bench] → METR Analys
 ### Directory Structure Logic
 
 ```
-human-ttc-eval/
+cyber-task-horizons/
 ├── data/
 │   ├── raw/                    # Retrieve outputs: unmodified source data
 │   └── processed/              # Prepare outputs: METR-format runs and tasks
@@ -158,12 +160,6 @@ def get_retriever(name: str) -> Type[Retrieve]:
 **Resource Limits**: CPU, memory, network, and time constraints  
 **Security Isolation**: Prevents information leakage between evaluations
 
-### Docker Environment Management
-- **Per-Challenge Isolation**: Each task runs in dedicated containers
-- **Network Segmentation**: Realistic network access controls
-- **Secret Rotation**: Randomized flags and credentials prevent memorization
-- **Resource Quotas**: Prevent resource exhaustion attacks
-
 ## METR Analysis Integration
 
 ### Data Transformation (`analysis/transform.py`)
@@ -189,41 +185,6 @@ Direct integration with METR's analysis tools:
 **Model Defaults**: Standard model configurations and parameters  
 **Evaluation Parameters**: Timeout values, iteration limits, sampling rates
 
-```python
-# Key configuration elements
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "results"
-THIRD_PARTY_DIR = PROJECT_ROOT / "third-party"
-
-DEFAULT_MODEL = "openai/gpt-4o-2024-05-13"
-DEFAULT_MAX_ITERATIONS = 20
-DEFAULT_TIMEOUT_SECONDS = 3600
-```
-
-### Environment-Specific Overrides
-`.env` file for local customization without code changes:
-```bash
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-DEFAULT_MODEL=anthropic/claude-3-5-sonnet-20241022
-LOG_LEVEL=DEBUG
-```
-
-## Error Handling and Logging
-
-### Graceful Degradation
-- **Partial Success**: Components continue operating when individual tasks fail
-- **Error Isolation**: Failures don't compromise other evaluations
-- **Recovery Strategies**: Automatic retry with exponential backoff
-- **Fallback Options**: Alternative approaches when primary methods fail
-
-### Comprehensive Logging
-- **Structured Messages**: Consistent format across all components
-- **Context Preservation**: Full error context for debugging
-- **Performance Metrics**: Timing and resource usage tracking
-- **Security Awareness**: No secret or sensitive data in logs
-
 ## Extension Points
 
 ### Adding New Datasets
@@ -242,33 +203,3 @@ LOG_LEVEL=DEBUG
 1. **Model Metadata**: Add entry to `models.json`
 2. **Evaluation Compatibility**: Ensure model works with inspect_ai harnesses
 3. **Configuration**: Add any model-specific parameters to config
-
-## Performance Considerations
-
-### Batch Processing
-- **Parallel Evaluation**: Multiple tasks evaluated simultaneously where safe
-- **Rate Limiting**: Respect API limits while maximizing throughput
-- **Caching**: Avoid redundant computations and API calls
-- **Resource Management**: Balance speed with system stability
-
-### Storage Efficiency
-- **Incremental Processing**: Only recompute when source data changes
-- **Compressed Archives**: Efficient storage of large result sets
-- **Selective Loading**: Load only required data for analysis
-- **Cleanup Utilities**: Remove temporary files and manage disk usage
-
-## Security Considerations
-
-### Evaluation Safety
-- **Sandboxed Execution**: All model interactions in isolated environments
-- **Network Isolation**: Prevent unauthorized external communication
-- **Resource Limits**: Prevent denial-of-service through resource exhaustion
-- **Secret Management**: Secure handling of API keys and credentials
-
-### Data Protection
-- **No PII Logging**: Avoid recording personally identifiable information
-- **API Key Isolation**: Keys stored in environment, never in code
-- **Result Sanitization**: Remove sensitive data from evaluation outputs
-- **Access Controls**: Appropriate file permissions on sensitive data
-
-This architecture enables reliable, extensible cybersecurity AI evaluation while maintaining scientific rigor and compatibility with established methodologies.
