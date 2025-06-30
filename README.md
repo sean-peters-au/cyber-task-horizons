@@ -69,10 +69,13 @@ cp .env.template .env
 # clone third-party repos
 make third-party
 
-# For GPT2 and GPT3
+# for GPT2 and GPT3
 make start-local-model-servers
 
-# run fast tier (cheap models, 1 run each)
+# run a benchmark
+make bench DATASET=cybashbench MODEL=openai/davinci-002
+
+# run fast tier (cheap models, 1 run each, on all datasets)
 make repro TIER=1
 
 # generate plots
