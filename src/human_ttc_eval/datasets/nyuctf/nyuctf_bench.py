@@ -368,15 +368,20 @@ class NyuctfBench(Bench):
             if first_service:
                 return first_service.get('container_port')
         
-        port = metadata.get('internal_port')
-        if port:
-            return port
-    
+        # Look for both 'internal_port' (preferred) and fallback 'port' keys
+        for key in ("internal_port", "port"):
+            port = metadata.get(key)
+            if port:
+                return port
+        
         challenge_json_path = challenge_dir / "challenge.json"
         if challenge_json_path.exists():
             try:
                 challenge_json = json.loads(challenge_json_path.read_text())
-                return challenge_json.get('internal_port')
+                return (
+                    challenge_json.get('internal_port')
+                    or challenge_json.get('port')
+                )
             except Exception:
                 pass
         return None
