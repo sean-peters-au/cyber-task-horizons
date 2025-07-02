@@ -1,0 +1,23 @@
+{
+  "dataset": "nyuctf",
+  "model": "openai/davinci-002",
+  "alias": "openai/davinci-002",
+  "timestamp": "2025-06-30T12:00:45.273290+00:00",
+  "stats": {
+    "total_tasks": 50,
+    "successful_tasks": 0,
+    "success_rate": 0.0,
+    "total_generation_cost": 0.0,
+    "mean_score_cont": 0.0,
+    "human_success_rate": 1.0,
+    "relative_performance": 0.0,
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/davinci-002' cannot run tool-requiring NYUCTF tasks"
+  },
+  "metadata": {
+    "zero_imputed": true,
+    "imputation_reason": "Model 'openai/davinci-002' cannot run tool-requiring NYUCTF tasks",
+    "duration_seconds": 0.001056,
+    "num_tasks": 50
+  }
+}

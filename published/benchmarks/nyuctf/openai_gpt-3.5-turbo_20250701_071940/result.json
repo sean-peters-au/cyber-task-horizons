@@ -1,0 +1,25 @@
+{
+  "dataset_name": "nyuctf",
+  "model_name": "openai/gpt-3.5-turbo",
+  "model_alias": "openai/gpt-3.5-turbo",
+  "runs": [],
+  "summary_stats": {
+    "error": "No runs to analyze",
+    "category_breakdown": {},
+    "year_breakdown": {},
+    "event_breakdown": {}
+  },
+  "metadata": {
+    "duration_seconds": 129.796325,
+    "num_tasks": 50,
+    "inspect_ai_version": "0.3.89",
+    "max_messages": 50,
+    "is_local_model": false,
+    "resumed": false,
+    "num_completed_from_previous": 0,
+    "num_new_completions": 0
+  },
+  "timestamp": "2025-06-30T21:17:31.040123+00:00",
+  "success": true,
+  "error_message": null
+}
