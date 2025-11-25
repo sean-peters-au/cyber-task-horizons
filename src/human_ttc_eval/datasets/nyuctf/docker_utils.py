@@ -63,7 +63,7 @@ def _get_ctfnet_subnet() -> Optional[str]:
         return None
 
 
-def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, Any]]:
+def modify_compose_file(original_compose_file: Path, task_id: str) -> Tuple[Path, Dict[str, Any], str]:
     """
     Modifies a docker-compose.yml file for the evaluation environment.
 
@@ -71,8 +71,15 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
     - Adds network aliases to challenge services.
     - Replaces fixed ports with dynamic ones to avoid conflicts.
 
+    Args:
+        original_compose_file: Path to the original docker-compose.yml.
+        task_id: Unique task identifier used to generate a unique network alias.
+
     Returns:
-        A tuple containing the path to the modified compose file and port info.
+        A tuple containing:
+        - Path to the modified compose file
+        - Port info dictionary
+        - The unique network alias for this task
     """
     try:
         with open(original_compose_file, 'r') as f:
@@ -90,6 +97,8 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
 
     # 2. Process existing challenge services
     category = extract_category_from_path(original_compose_file)
+    network_alias = _generate_network_alias(task_id, category)
+    
     for service_name, service_config in compose_data.get('services', {}).items():
         if service_name == 'default':
             # This is our custom agent, ensure platform is set for ARM hosts
@@ -97,7 +106,7 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
             continue
         
         # Add network alias
-        _add_network_alias(service_config, category)
+        _add_network_alias(service_config, network_alias)
         
         # Ensure platform compatibility for ARM hosts
         if 'platform' not in service_config:
@@ -124,11 +133,20 @@ def modify_compose_file(original_compose_file: Path) -> Tuple[Path, Dict[str, An
 
     logger.debug(f"Created modified compose file: {temp_file}")
     logger.debug(f"Port mappings: {port_info}")
-    return temp_file, port_info
+    logger.debug(f"Network alias: {network_alias}")
+    return temp_file, port_info, network_alias
 
 
-def create_minimal_compose_file() -> Path:
-    """Creates a compose file with only the agent service."""
+def create_minimal_compose_file(task_id: str, category: Optional[str] = None) -> Tuple[Path, str]:
+    """Creates a compose file with only the agent service.
+    
+    Args:
+        task_id: Unique task identifier used to generate a unique network alias.
+        category: Optional category for the challenge.
+    
+    Returns:
+        A tuple containing the path to the compose file and the network alias.
+    """
     compose_data = {'services': {}}
     
     ctfnet_subnet = _get_ctfnet_subnet()
@@ -142,12 +160,36 @@ def create_minimal_compose_file() -> Path:
         nyuctf_config.NETWORK_NAME: {'external': True}
     }
     
+    network_alias = _generate_network_alias(task_id, category)
+    
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as f:
         yaml.safe_dump(compose_data, f, default_flow_style=False)
         temp_file = Path(f.name)
 
     logger.debug(f"Created minimal compose file for static challenge: {temp_file}")
-    return temp_file
+    logger.debug(f"Network alias: {network_alias}")
+    return temp_file, network_alias
+
+
+def _generate_network_alias(task_id: str, category: Optional[str] = None) -> str:
+    """Generate a unique network alias for a task.
+    
+    Args:
+        task_id: Unique task identifier.
+        category: Optional category (pwn, crypto, etc.).
+    
+    Returns:
+        A unique network alias like "task-abc123.chal.csaw.io" or 
+        "task-abc123-pwn.chal.csaw.io" if category is provided.
+    """
+    # Sanitize task_id for use in DNS (lowercase, replace invalid chars)
+    sanitized_id = task_id.lower().replace('_', '-').replace('/', '-')
+    # Truncate if too long (DNS labels max 63 chars, leave room for suffix)
+    sanitized_id = sanitized_id[:40]
+    
+    if category and category in nyuctf_config.CTF_CATEGORIES:
+        return f"{sanitized_id}-{category}.chal.csaw.io"
+    return f"{sanitized_id}.chal.csaw.io"
 
 
 def _add_agent_service(compose_data: dict, ctfnet_subnet: Optional[str]) -> None:
@@ -197,9 +239,14 @@ LOCK
         'command': setup_command
     }
     
-def _add_network_alias(service_config: dict, category: Optional[str]) -> None:
-    """Adds a category-based network alias to a service."""
-    if not category:
+def _add_network_alias(service_config: dict, network_alias: str) -> None:
+    """Adds a unique network alias to a service.
+    
+    Args:
+        service_config: The service configuration dict to modify.
+        network_alias: The unique network alias to add (e.g., "task-abc123-pwn.chal.csaw.io").
+    """
+    if not network_alias:
         return
         
     if 'networks' not in service_config:
@@ -213,12 +260,11 @@ def _add_network_alias(service_config: dict, category: Optional[str]) -> None:
     if nyuctf_config.NETWORK_NAME not in service_config['networks']:
         service_config['networks'][nyuctf_config.NETWORK_NAME] = {}
 
-    alias = f"{category}.chal.csaw.io"
     aliases = service_config['networks'][nyuctf_config.NETWORK_NAME].get('aliases', [])
-    if alias not in aliases:
-        aliases.append(alias)
+    if network_alias not in aliases:
+        aliases.append(network_alias)
     service_config['networks'][nyuctf_config.NETWORK_NAME]['aliases'] = aliases
-    logger.debug(f"Added network alias '{alias}'")
+    logger.debug(f"Added network alias '{network_alias}'")
 
 def _remap_service_ports(service_config: dict) -> list:
     """Remaps fixed ports to dynamic ones, returns port info."""

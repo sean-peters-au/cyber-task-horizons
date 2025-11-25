@@ -17,11 +17,11 @@ from inspect_ai.solver import generate, system_message
 from inspect_ai.scorer import scorer, Score, Target, accuracy
 from inspect_ai.model import GenerateConfig
 from pydantic import BaseModel
-from openai import OpenAI
 
 from human_ttc_eval.core.registry import register_bench
 from human_ttc_eval.datasets.nl2bash.nl2bash_bench import NL2BashBench
 from human_ttc_eval.core.run import Run
+from human_ttc_eval.core.llm_utils import LLMConfig, LLMClient
 from human_ttc_eval.config import PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
@@ -200,6 +200,8 @@ class CyBashBench(NL2BashBench):
     
     def _create_cybash_scorer(self):
         """Create a custom LLM scorer using structured JSON output."""
+        import re
+        import json as json_module
         
         @scorer(metrics=[accuracy()])
         def cybash_scorer():
@@ -224,44 +226,66 @@ class CyBashBench(NL2BashBench):
                     return Score(value=score_value, explanation=explanation)
                 
                 # Use LLM with structured output for evaluation
-                client = OpenAI()
-                
-                # System prompt for scoring
-                system_prompt = self._get_scoring_system_prompt(task_type)
-                
-                # User prompt with task details
-                user_prompt = self._get_scoring_user_prompt(task_type, task_description, target_text, generated)
-                
-                # Call with structured output
-                response = client.chat.completions.create(
-                    model="o4-mini-2025-04-16",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "scoring_response",
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "thinking": {"type": "string"},
-                                    "score": {"type": "number"}
-                                },
-                                "required": ["thinking", "score"],
-                                "additionalProperties": False
-                            },
-                            "strict": True
-                        }
-                    },
-                )
-                
-                # Parse the structured response
-                response_content = response.choices[0].message.content
-                response_data = ScoringResponse.model_validate_json(response_content)
-                score_value = max(0.0, min(1.0, response_data.score))
-                explanation = f"{task_type} score: {score_value} | Reasoning: {response_data.thinking}"
+                try:
+                    config_obj = LLMConfig(
+                        provider="anthropic",
+                        model="claude-haiku-4-5",
+                        max_tokens=1000,
+                        temperature=0.0
+                    )
+                    
+                    client = LLMClient(config_obj)
+                    
+                    # System prompt for scoring
+                    system_prompt = self._get_scoring_system_prompt(task_type)
+                    
+                    # User prompt with task details - ask for compact single-line JSON
+                    user_prompt = self._get_scoring_user_prompt(task_type, task_description, target_text, generated)
+                    user_prompt += "\n\nRespond with ONLY a single-line compact JSON (no newlines, no markdown): {\"thinking\":\"brief reasoning\",\"score\":0.5}"
+                    
+                    # Call LLM
+                    response_content = client.call(
+                        prompt=user_prompt,
+                        system_prompt=system_prompt
+                    )
+                    
+                    # Strip markdown code blocks if present
+                    cleaned_content = response_content.strip()
+                    if cleaned_content.startswith('```'):
+                        lines = cleaned_content.split('\n')
+                        if lines[0].startswith('```'):
+                            lines = lines[1:]
+                        if lines and lines[-1].strip() == '```':
+                            lines = lines[:-1]
+                        cleaned_content = '\n'.join(lines).strip()
+                    
+                    # Try to parse JSON, with regex fallback
+                    thinking = ""
+                    score_value = 0.0
+                    try:
+                        # Try standard JSON parsing first
+                        parsed = json_module.loads(cleaned_content)
+                        thinking = parsed.get("thinking", "")
+                        score_value = float(parsed.get("score", 0.0))
+                    except json_module.JSONDecodeError:
+                        # Fallback: extract score using regex
+                        score_match = re.search(r'"score"\s*:\s*([0-9.]+)', cleaned_content)
+                        thinking_match = re.search(r'"thinking"\s*:\s*"([^"]*)"', cleaned_content)
+                        if score_match:
+                            score_value = float(score_match.group(1))
+                        if thinking_match:
+                            thinking = thinking_match.group(1)
+                        if not score_match:
+                            # Last resort: find any decimal number
+                            num_match = re.search(r'\b([0-1]\.\d+|[01])\b', cleaned_content)
+                            if num_match:
+                                score_value = float(num_match.group(1))
+                    
+                    score_value = max(0.0, min(1.0, score_value))
+                    explanation = f"{task_type} score: {score_value} | {thinking}" if thinking else f"{task_type} score: {score_value}"
+                except Exception as e:
+                    logger.warning(f"LLM scoring failed: {e}, defaulting to 0.0")
+                    return Score(value=0.0, explanation=f"Scoring error: {str(e)}")
                 
                 return Score(value=score_value, explanation=explanation)
                     

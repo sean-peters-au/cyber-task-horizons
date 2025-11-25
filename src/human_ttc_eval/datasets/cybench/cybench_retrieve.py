@@ -23,7 +23,7 @@ class CybenchRetrieve(Retrieve):
     """Retrieves CyBench challenges from the inspect_evals repository."""
     
     DEFAULT_OUTPUT_FILENAME = "cybench_raw_data.jsonl"
-    CHALLENGE_INFO_FILENAME = "challenge.yaml"
+    CHALLENGE_INFO_FILENAME = "eval.yaml"
     
     def __init__(self, dataset_name: str = "cybench", output_filename: Optional[str] = None):
         """
@@ -91,21 +91,21 @@ class CybenchRetrieve(Retrieve):
             return None
     
     def _find_challenge_dirs(self) -> List[Path]:
-        """Find all challenge directories containing challenge.yaml files."""
+        """Find all challenge directories containing eval.yaml files."""
         challenge_dirs = []
         
         if not self.cybench_challenges_path.exists():
             logger.error(f"CyBench challenges directory not found: {self.cybench_challenges_path}")
             return challenge_dirs
         
-        # Recursively find all challenge.yaml files
+        # Recursively find all eval.yaml files
         for yaml_file in self.cybench_challenges_path.rglob(self.CHALLENGE_INFO_FILENAME):
             challenge_dirs.append(yaml_file.parent)
         
         return sorted(challenge_dirs)  # Sort for consistent ordering
     
     def _load_challenge_info(self, challenge_dir: Path) -> Optional[Dict[str, Any]]:
-        """Load and parse challenge.yaml file."""
+        """Load and parse eval.yaml file."""
         yaml_path = challenge_dir / self.CHALLENGE_INFO_FILENAME
         
         try:

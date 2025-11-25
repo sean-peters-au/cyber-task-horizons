@@ -29,8 +29,9 @@ RUN apt-get install -y mtools strace gdb ltrace bsdmainutils binwalk
 # -----------------------------------------------------------------------------
 # Install pip and common Python packages.
 # pycryptodome provides the 'Crypto' namespace needed for some challenges.
+# Note: --break-system-packages is safe in containerized environments
 RUN apt-get install -y python3-pip python3-dev libffi-dev build-essential && \
-    pip install --no-cache-dir pycryptodome pwntools gmpy2 z3-solver 
+    pip install --break-system-packages --no-cache-dir pycryptodome pwntools gmpy2 z3-solver 
 
     
 # -----------------------------------------------------------------------------

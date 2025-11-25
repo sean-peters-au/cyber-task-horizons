@@ -167,12 +167,103 @@
     },
     {
       "provider": "google",
+      "model_name": "gemini-3-pro-preview",
+      "full_name": "google/gemini-3-pro-preview",
+      "release_date": "2025-11-18",
+      "max_output_tokens": 65536,
+      "description": "Gemini 3 Pro preview"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5.1-2025-11-13",
+      "full_name": "openai/gpt-5.1-2025-11-13",
+      "release_date": "2025-11-13",
+      "max_output_tokens": 128000,
+      "description": "GPT-5.1 – OpenAI's latest model"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5-mini-2025-08-07",
+      "full_name": "openai/gpt-5-mini-2025-08-07",
+      "release_date": "2025-08-07",
+      "max_output_tokens": 128000,
+      "description": "GPT-5 Mini"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5-nano-2025-08-07",
+      "full_name": "openai/gpt-5-nano-2025-08-07",
+      "release_date": "2025-08-07",
+      "max_output_tokens": 128000,
+      "description": "GPT-5 Nano"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5-2025-08-07",
+      "full_name": "openai/gpt-5-2025-08-07",
+      "release_date": "2025-08-07",
+      "max_output_tokens": 128000,
+      "description": "GPT-5"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5-pro-2025-10-06",
+      "full_name": "openai/gpt-5-pro-2025-10-06",
+      "release_date": "2025-10-06",
+      "max_output_tokens": 128000,
+      "description": "GPT-5 Pro"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5.1-codex",
+      "full_name": "openai/gpt-5.1-codex",
+      "release_date": "2025-11-13",
+      "max_output_tokens": 128000,
+      "description": "GPT-5.1 Codex"
+    },
+    {
+      "provider": "openai",
+      "model_name": "gpt-5-codex",
+      "full_name": "openai/gpt-5-codex",
+      "release_date": "2025-11-13",
+      "max_output_tokens": 128000,
+      "description": "GPT-5 Codex"
+    },
+    {
+      "provider": "google",
       "model_name": "gemini-2.5-pro-preview-06-05",
       "full_name": "google/gemini-2.5-pro-preview-06-05",
       "release_date": "2025-06-05",
       "max_output_tokens": 8192,
       "description": "Gemini 2.5 Pro GA – full release announced at I/O follow-up",
       "alias": "Gemini 2.5 Pro (June 2025)"
+    },
+    {
+      "provider": "anthropic",
+      "model_name": "claude-haiku-4-5-20251001",
+      "full_name": "anthropic/claude-haiku-4-5-20251001",
+      "release_date": "2025-10-01",
+      "max_output_tokens": 8192,
+      "description": "Claude Haiku 4.5 – Anthropic's fastest model with near-frontier capabilities",
+      "alias": "Claude Haiku 4.5"
+    },
+    {
+      "provider": "anthropic",
+      "model_name": "claude-sonnet-4-5-20250929",
+      "full_name": "anthropic/clauclaude-sonnet-4-5-20250929",
+      "release_date": "2025-09-29",
+      "max_output_tokens": 8192,
+      "description": "Claude Sonnet 4.5 – Anthropic's frontier-level model",
+      "alias": "Claude Sonnet 4.5"
+    },
+    {
+      "provider": "anthropic",
+      "model_name": "claude-sonnet-4-5-20250929",
+      "full_name": "anthropic/claude-sonnet-4-5-20250929",
+      "release_date": "2025-05-14",
+      "max_output_tokens": 8192,
+      "description": "Claude Sonnet 4",
+      "alias": "Claude Sonnet 4"
     }
   ],
   "metadata": {

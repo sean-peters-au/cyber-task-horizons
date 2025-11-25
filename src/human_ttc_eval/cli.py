@@ -16,6 +16,10 @@ from .datasets.nyuctf import nyuctf_retrieve # noqa
 from .datasets.nyuctf import nyuctf_prepare # noqa
 from .datasets.nyuctf import nyuctf_describe # noqa
 from .datasets.nyuctf import nyuctf_bench # noqa
+from .datasets.cvebench import cvebench_retrieve # noqa
+from .datasets.cvebench import cvebench_prepare # noqa
+from .datasets.cvebench import cvebench_describe # noqa
+from .datasets.cvebench import cvebench_bench # noqa
 from .analysis.plotter import create_horizon_plots
 
 from .core.registry import (

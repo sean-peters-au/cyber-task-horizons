@@ -2,7 +2,8 @@
 
 # --- Variables ---
 PYTHON = uv run python
-HTE_CLI = PYTHONPATH=src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
+# Include third-party/inspect_evals/src for inspect_evals modules (cybench, cve_bench, etc.)
+HTE_CLI = PYTHONPATH=third-party/inspect_evals/src:src:$(PYTHONPATH) $(PYTHON) -m human_ttc_eval.cli
 
 # Core variables
 MODEL ?= openai/gpt2-xl
@@ -12,7 +13,7 @@ DATASET ?= cybench
 TIER ?= 1
 
 # Dataset list
-DATASETS = cybench nl2bash intercode-ctf cybashbench nyuctf
+DATASETS = cybench nl2bash intercode-ctf cybashbench nyuctf cvebench
 
 # Repositories to clone
 THIRD_PARTY_REPOS = \
@@ -21,7 +22,8 @@ THIRD_PARTY_REPOS = \
     https://github.com/princeton-nlp/intercode.git \
     https://github.com/andyzorigin/cybench.git \
     https://github.com/sean-peters-au/NYU_CTF_Bench.git \
-    https://github.com/TellinaTool/nl2bash.git
+    https://github.com/TellinaTool/nl2bash.git \
+    https://github.com/uiuc-kang-lab/cve-bench.git
 
 # Custom Docker image
 CUSTOM_AGENT_IMAGE = human-ttc-eval-agent:latest
@@ -71,7 +73,7 @@ MODELS_PUBLICATION = \
 
 # Phony targets
 .PHONY: all help datasets docs clean clean_datasets clean_benchmarks clean_docs test \
-        retrieve prepare describe bench retrieve-all prepare-all describe-all \
+        retrieve prepare describe bench bench-all bench-all-only retrieve-all prepare-all describe-all \
         plot third-party repro progress run-gpt2xl-local \
         run-davinci-local start-local-model-servers stop-local-model-servers \
         build-agent-image
@@ -123,6 +125,8 @@ help:
 	@echo ""
 	@echo "Benchmarking commands:"
 	@echo "  make bench DATASET=cybench MODEL=openai/gpt-4 - Run single benchmark"
+	@echo "  make bench-all MODEL=openai/gpt-4 - Run single model on all datasets (with prepare)"
+	@echo "  make bench-all-only MODEL=openai/gpt-4 - Run single model on all datasets (skip prepare)"
 	@echo "  make progress             - Check progress against publication models"
 	@echo "  make repro TIER=1       - Run all datasets on MODELS_1 (fast)"
 	@echo "  make repro TIER=2       - Run all datasets on MODELS_2 (medium)"
@@ -195,6 +199,23 @@ bench: prepare
 	@echo "Model: $(MODEL), Runs: $(NUM_RUNS)"
 	@mkdir -p results/benchmarks/$(DATASET)
 	$(HTE_CLI) benchmark $(DATASET) --model "$(MODEL)" --num-runs $(NUM_RUNS) 
+
+bench-all: prepare-all
+	@echo ">>> Running $(MODEL) on all datasets..."
+	@for dataset in $(DATASETS); do \
+		echo ">>> Running $(MODEL) on $$dataset..."; \
+		$(MAKE) bench DATASET=$$dataset MODEL="$(MODEL)" NUM_RUNS=$(NUM_RUNS) || echo "Failed: $(MODEL) on $$dataset"; \
+	done
+	@echo ">>> Completed $(MODEL) evaluation across all datasets!"
+
+bench-all-only:
+	@echo ">>> Running $(MODEL) on all datasets (skipping prepare)..."
+	@for dataset in $(DATASETS); do \
+		echo ">>> Running $(MODEL) on $$dataset..."; \
+		mkdir -p results/benchmarks/$$dataset; \
+		$(HTE_CLI) benchmark $$dataset --model "$(MODEL)" --num-runs $(NUM_RUNS) || echo "Failed: $(MODEL) on $$dataset"; \
+	done
+	@echo ">>> Completed $(MODEL) evaluation across all datasets!"
 
 # --- Progress Check Target ---
 progress:

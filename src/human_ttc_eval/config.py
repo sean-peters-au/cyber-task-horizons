@@ -34,8 +34,8 @@ DEFAULT_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 LLM_BATCH_SIZE = 100
 LLM_MAX_TOKENS = 4096
 LLM_TEMPERATURE = 0.1
-LLM_MAX_CONNECTIONS = 2 # Default concurrency for inspect_ai
-
+LLM_MAX_CONNECTIONS = 4 # 2 is default concurrency for inspect_ai
+LLM_MAX_CONNECTIONS_CYBENCH = 1
 # NL2Bash Configuration
 ENABLE_LLM_TIMING = False  # Set to False to skip LLM time estimation
 NL2BASH_LLM_PROVIDER = 'anthropic'
@@ -43,14 +43,14 @@ NL2BASH_LLM_MODEL = 'claude-3-5-sonnet-20241022'
 NL2BASH_BATCH_SIZE = 100
 NL2BASH_SAMPLE_SIZE = 200
 # CyBench Configuration (user-tunable parameters)
-CYBENCH_MAX_ITERATIONS = 50
+CYBENCH_TOKEN_LIMIT = 200_000  # 200K tokens per sample
 CYBENCH_IMPUTE_ZERO = [
     "openai/gpt2-xl",
     "openai/davinci-002",
 ]
 
 # InterCode-CTF Configuration
-INTERCODE_MAX_ITERATIONS = 30
+INTERCODE_TOKEN_LIMIT = 200_000  # 200K tokens per sample
 INTERCODE_IMPUTE_ZERO = [
     "openai/gpt2-xl", 
     "openai/davinci-002",
@@ -59,9 +59,19 @@ INTERCODE_IMPUTE_ZERO = [
 # NYUCTF Configuration
 NYUCTF_SAMPLE_SIZE = 50
 NYUCTF_RANDOM_SEED = 42
-NYUCTF_MAX_ITERATIONS = 50
+NYUCTF_TOKEN_LIMIT = 200_000  # 200K tokens per sample
 NYUCTF_STRATIFY_BY_POINTS = True  # Sample across difficulty levels (easy/medium/hard)
 NYUCTF_IMPUTE_ZERO = [
+    "openai/gpt2-xl",
+    "openai/davinci-002",
+]
+
+# CVE-Bench Configuration
+CVEBENCH_DEFAULT_VARIANT = "one_day"  # "one_day" (with CVE hints) or "zero_day" (no hints)
+CVEBENCH_TOKEN_LIMIT = 200_000  # 200K tokens per sample
+CVEBENCH_SANDBOX_TYPE = "docker"  # "docker" or "k8s"
+CVEBENCH_MESSAGE_LIMIT = 10000  # 10000 messages per sample
+CVEBENCH_IMPUTE_ZERO = [
     "openai/gpt2-xl",
     "openai/davinci-002",
 ]
@@ -76,6 +86,10 @@ THIRD_PARTY_DIR = PROJECT_ROOT / "third-party"
 CYBENCH_REPO_PATH = THIRD_PARTY_DIR / "cybench"
 NL2BASH_REPO_PATH = THIRD_PARTY_DIR / "nl2bash"
 INTERCODE_REPO_PATH = THIRD_PARTY_DIR / "intercode"
+INSPECT_EVALS_PATH = THIRD_PARTY_DIR / "inspect_evals"
+# CVE-Bench repo contains the challenges (not included in pip package)
+CVEBENCH_REPO_PATH = THIRD_PARTY_DIR / "cve-bench"
+CVEBENCH_CHALLENGES_DIR = CVEBENCH_REPO_PATH / "src" / "critical" / "challenges"
 
 def has_api_key(provider: str) -> bool:
     """Check if API key is available for a provider."""
