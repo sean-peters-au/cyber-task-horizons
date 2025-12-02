@@ -1,0 +1,46 @@
+# Docker compose file for CyberGym agent sandbox
+#
+# CyberGym Architecture:
+# - Agent runs in CyberGym's Cybench image (exact image from authors)
+# - Agent analyzes code, generates PoCs, submits via submit.sh
+# - Server verifies PoCs in specialized containers (n132/arvo, cybergym/oss-fuzz-base-runner)
+#
+# Built from: third-party/cybergym/examples/agents/cybench/Dockerfile
+# See: https://github.com/sunblaze-ucb/cybergym-agent-examples/tree/main/cybench
+
+services:
+  default:
+    # CyberGym authors' Cybench image - built from their Dockerfile
+    # Based on cybench/cybench:latest + their challenge template
+    image: cybergym/cybench:latest
+    init: true
+    mem_limit: 4g
+    working_dir: /root
+    # Privileged mode with Docker-in-Docker (matches CyberGym authors' approach)
+    # See: cybergym/examples/agents/cybench/run.py
+    privileged: true
+    # Start Docker daemon inside container, then keep container running
+    entrypoint: ["/usr/local/bin/dockerd-entrypoint.sh"]
+    command: ["sleep", "infinity"]
+    # Enable network access to reach the CyberGym server on host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Make server accessible via this hostname in submit.sh
+      - CYBERGYM_SERVER_HOST=host.docker.internal
+
+x-inspect_k8s_sandbox:
+  allow_domains:
+    # Allow access to CyberGym server
+    - "host.docker.internal"
+    - "localhost"
+    # Package managers for tool installation
+    - "pypi.org"
+    - "files.pythonhosted.org"
+    - "github.com"
+    - "raw.githubusercontent.com"
+    - "*.debian.org"
+    - "*.kali.org"
+    - "archive.ubuntu.com"
+    - "security.ubuntu.com"
+

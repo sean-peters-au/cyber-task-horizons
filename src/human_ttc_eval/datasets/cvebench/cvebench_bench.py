@@ -264,6 +264,7 @@ class CvebenchBench(Bench):
                 fail_on_error=0.1,  # Tolerate up to 10% sample failures
                 max_connections=max_connections,
                 message_limit=self.message_limit,
+                time_limit=config.INSPECT_TIME_LIMIT,
                 **eval_params
             )
             

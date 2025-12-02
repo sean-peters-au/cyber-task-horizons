@@ -13,7 +13,7 @@ DATASET ?= cybench
 TIER ?= 1
 
 # Dataset list
-DATASETS = cybench nl2bash intercode-ctf cybashbench nyuctf cvebench
+DATASETS = cybench nl2bash intercode-ctf cybashbench nyuctf cvebench cybergym
 
 # Repositories to clone
 THIRD_PARTY_REPOS = \
@@ -23,7 +23,8 @@ THIRD_PARTY_REPOS = \
     https://github.com/andyzorigin/cybench.git \
     https://github.com/sean-peters-au/NYU_CTF_Bench.git \
     https://github.com/TellinaTool/nl2bash.git \
-    https://github.com/uiuc-kang-lab/cve-bench.git
+    https://github.com/uiuc-kang-lab/cve-bench.git \
+    https://github.com/sunblaze-ucb/cybergym.git
 
 # Custom Docker image
 CUSTOM_AGENT_IMAGE = human-ttc-eval-agent:latest
@@ -76,7 +77,7 @@ MODELS_PUBLICATION = \
         retrieve prepare describe bench bench-all bench-all-only retrieve-all prepare-all describe-all \
         plot third-party repro progress run-gpt2xl-local \
         run-davinci-local start-local-model-servers stop-local-model-servers \
-        build-agent-image
+        build-agent-image cybergym-setup cybergym-server bench-cybergym
 
 # --- Docker Image Build ---
 build-agent-image:
@@ -273,6 +274,115 @@ stop-local-model-servers:
 	@echo ">>> Stopping all local model servers..."
 	@pkill -f "vllm.entrypoints.openai.api_server" || echo "No vLLM server running"
 	@pkill -f "davinci_proxy_server.py" || echo "No davinci-002 proxy server running"
+
+# --- CyberGym Setup Targets ---
+
+# Minimal setup - only downloads data for 10 subset tasks (~500MB instead of ~10GB)
+cybergym-setup-minimal: third-party
+	@echo ">>> Setting up CyberGym benchmark (MINIMAL: 10 tasks only)..."
+	@mkdir -p third-party/cybergym_data/data/arvo
+	@mkdir -p third-party/cybergym_data/data/oss-fuzz
+	@# Download only subset task data from HuggingFace
+	@echo ">>> Downloading subset task files from HuggingFace..."
+	@for id in 47101 3938 24993 1065 10400 368; do \
+		if [ ! -d "third-party/cybergym_data/data/arvo/$$id" ]; then \
+			echo "  Downloading arvo:$$id..."; \
+			mkdir -p third-party/cybergym_data/data/arvo/$$id; \
+			curl -sL "https://huggingface.co/datasets/sunblaze-ucb/cybergym/resolve/main/data/arvo/$$id/description.txt" -o "third-party/cybergym_data/data/arvo/$$id/description.txt" 2>/dev/null || true; \
+			curl -sL "https://huggingface.co/datasets/sunblaze-ucb/cybergym/resolve/main/data/arvo/$$id/repo-vul.tar.gz" -o "third-party/cybergym_data/data/arvo/$$id/repo-vul.tar.gz" 2>/dev/null || true; \
+			curl -sL "https://huggingface.co/datasets/sunblaze-ucb/cybergym/resolve/main/data/arvo/$$id/error.txt" -o "third-party/cybergym_data/data/arvo/$$id/error.txt" 2>/dev/null || true; \
+		fi; \
+	done
+	@# Download tasks.json for task metadata
+	@if [ ! -f "third-party/cybergym_data/tasks.json" ]; then \
+		echo ">>> Downloading tasks.json..."; \
+		curl -sL "https://huggingface.co/datasets/sunblaze-ucb/cybergym/resolve/main/tasks.json" -o "third-party/cybergym_data/tasks.json"; \
+	fi
+	@echo ">>> Pulling Docker images for CyberGym subset..."
+	uv pip install docker -q
+	PYTHONPATH=third-party/cybergym/src:$$PYTHONPATH .venv/bin/python third-party/cybergym/scripts/server_data/download_subset.py
+	@if [ ! -f "third-party/cybergym-oss-fuzz-data-subset.7z" ]; then \
+		echo ">>> Downloading oss-fuzz subset data..."; \
+		cd third-party && wget -q --show-progress https://huggingface.co/datasets/sunblaze-ucb/cybergym-server/resolve/main/cybergym-oss-fuzz-data-subset.7z; \
+	fi
+	@if [ ! -d "third-party/oss-fuzz-data" ]; then \
+		echo ">>> Extracting oss-fuzz subset data (requires 7z)..."; \
+		cd third-party && 7z x -y cybergym-oss-fuzz-data-subset.7z; \
+	fi
+	@echo ">>> CyberGym MINIMAL setup complete!"
+	@echo ">>> To run evaluations, first start the server: make cybergym-server"
+
+# Full setup - downloads entire HuggingFace dataset (~10GB, requires git-lfs)
+cybergym-setup: third-party
+	@echo ">>> Setting up CyberGym benchmark (subset: 10 tasks)..."
+	@# Check for git-lfs
+	@if ! command -v git-lfs &> /dev/null && ! git lfs version &> /dev/null; then \
+		echo "ERROR: git-lfs is required but not installed."; \
+		echo "Install with: brew install git-lfs && git lfs install"; \
+		exit 1; \
+	fi
+	@if [ ! -d "third-party/cybergym_data" ]; then \
+		echo ">>> Cloning CyberGym HuggingFace dataset (requires git-lfs)..."; \
+		git lfs install; \
+		git clone https://huggingface.co/datasets/sunblaze-ucb/cybergym third-party/cybergym_data; \
+	else \
+		echo ">>> third-party/cybergym_data already exists. Skipping clone."; \
+	fi
+	@echo ">>> Pulling Docker images for CyberGym subset..."
+	@# Install docker package and run download script using project's venv
+	uv pip install docker -q
+	PYTHONPATH=third-party/cybergym/src:$$PYTHONPATH .venv/bin/python third-party/cybergym/scripts/server_data/download_subset.py
+	@if [ ! -f "third-party/cybergym-oss-fuzz-data-subset.7z" ]; then \
+		echo ">>> Downloading oss-fuzz subset data..."; \
+		cd third-party && wget -q https://huggingface.co/datasets/sunblaze-ucb/cybergym-server/resolve/main/cybergym-oss-fuzz-data-subset.7z; \
+	fi
+	@if [ ! -d "third-party/oss-fuzz-data" ]; then \
+		echo ">>> Extracting oss-fuzz subset data..."; \
+		cd third-party && 7z x -y cybergym-oss-fuzz-data-subset.7z; \
+	fi
+	@echo ">>> CyberGym setup complete!"
+	@echo ">>> To run evaluations, first start the server: make cybergym-server"
+
+cybergym-server:
+	@echo ">>> Starting CyberGym PoC submission server..."
+	@echo ">>> Server will be available at http://localhost:8666"
+	@echo ">>> Press Ctrl+C to stop the server"
+	@mkdir -p third-party/cybergym_server_poc
+	cd third-party/cybergym && $(PYTHON) -m cybergym.server \
+		--host 0.0.0.0 --port 8666 \
+		--log_dir ../cybergym_server_poc \
+		--db_path ../cybergym_server_poc/poc.db \
+		--cybergym_oss_fuzz_path ../oss-fuzz-data
+
+bench-cybergym:
+	@echo ">>> Starting CyberGym server in background..."
+	@mkdir -p third-party/cybergym_server_poc
+	@cd third-party/cybergym && $(PYTHON) -m cybergym.server \
+		--host 0.0.0.0 --port 8666 \
+		--log_dir ../cybergym_server_poc \
+		--db_path ../cybergym_server_poc/poc.db \
+		--cybergym_oss_fuzz_path ../oss-fuzz-data & \
+	echo $$! > .cybergym_server.pid
+	@echo ">>> Waiting for server to start..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if curl -s http://localhost:8666/docs > /dev/null 2>&1; then \
+			echo ">>> Server is ready!"; \
+			break; \
+		fi; \
+		if [ $$i -eq 10 ]; then \
+			echo "ERROR: Server failed to start"; \
+			kill `cat .cybergym_server.pid` 2>/dev/null || true; \
+			rm -f .cybergym_server.pid; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done
+	@echo ">>> Running CyberGym benchmark..."
+	-$(MAKE) bench DATASET=cybergym MODEL="$(MODEL)" NUM_RUNS=$(NUM_RUNS)
+	@echo ">>> Stopping CyberGym server..."
+	@kill `cat .cybergym_server.pid` 2>/dev/null || true
+	@rm -f .cybergym_server.pid
+	@echo ">>> Done."
 
 # --- Reproduction Pipeline ---
 repro: describe-all

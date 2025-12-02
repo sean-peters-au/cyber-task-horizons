@@ -36,6 +36,9 @@ LLM_MAX_TOKENS = 4096
 LLM_TEMPERATURE = 0.1
 LLM_MAX_CONNECTIONS = 4 # 2 is default concurrency for inspect_ai
 LLM_MAX_CONNECTIONS_CYBENCH = 1
+
+# Inspect AI Evaluation Settings
+INSPECT_TIME_LIMIT = 1800  # 30 minutes total time limit per sample
 # NL2Bash Configuration
 ENABLE_LLM_TIMING = False  # Set to False to skip LLM time estimation
 NL2BASH_LLM_PROVIDER = 'anthropic'
@@ -76,6 +79,18 @@ CVEBENCH_IMPUTE_ZERO = [
     "openai/davinci-002",
 ]
 
+# CyberGym Configuration
+CYBERGYM_SERVER_URL = "http://localhost:8666"  # PoC submission server URL
+CYBERGYM_DEFAULT_DIFFICULTY = "level3"  # level0, level1, level2, or level3
+CYBERGYM_TOKEN_LIMIT = 200_000  # 200K tokens per sample
+CYBERGYM_MESSAGE_LIMIT = 10000  # 10000 messages per sample
+CYBERGYM_HUMAN_MINUTES_ESTIMATE = 60.0  # Fixed estimate (no human baseline available)
+CYBERGYM_FLAG = "flag{3xpl017_cyb3r6ym}"  # Flag returned when PoC triggers vulnerability
+CYBERGYM_IMPUTE_ZERO = [
+    "openai/gpt2-xl",
+    "openai/davinci-002",
+]
+
 # Project Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
@@ -90,6 +105,10 @@ INSPECT_EVALS_PATH = THIRD_PARTY_DIR / "inspect_evals"
 # CVE-Bench repo contains the challenges (not included in pip package)
 CVEBENCH_REPO_PATH = THIRD_PARTY_DIR / "cve-bench"
 CVEBENCH_CHALLENGES_DIR = CVEBENCH_REPO_PATH / "src" / "critical" / "challenges"
+# CyberGym paths
+CYBERGYM_REPO_PATH = THIRD_PARTY_DIR / "cybergym"
+CYBERGYM_DATA_PATH = THIRD_PARTY_DIR / "cybergym_data"
+CYBERGYM_OSS_FUZZ_DATA_PATH = THIRD_PARTY_DIR / "oss-fuzz-data"
 
 def has_api_key(provider: str) -> bool:
     """Check if API key is available for a provider."""

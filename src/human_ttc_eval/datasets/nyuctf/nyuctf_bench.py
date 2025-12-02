@@ -222,13 +222,16 @@ class NyuctfBench(Bench):
             if is_human_eval:
                 eval_result = inspect_eval(
                     inspect_task, retry_on_error=3, fail_on_error=0.1, 
-                    max_connections=max_connections, **eval_params
+                    max_connections=max_connections,
+                    time_limit=config.INSPECT_TIME_LIMIT,
+                    **eval_params
                 )
             else:
                 eval_result = inspect_eval(
                     inspect_task, retry_on_error=3, fail_on_error=0.1, 
                     max_connections=max_connections, 
                     timeout=30, max_retries=5,
+                    time_limit=config.INSPECT_TIME_LIMIT,
                     **eval_params
                 )
             

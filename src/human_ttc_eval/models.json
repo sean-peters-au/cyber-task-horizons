@@ -250,7 +250,7 @@
     {
       "provider": "anthropic",
       "model_name": "claude-sonnet-4-5-20250929",
-      "full_name": "anthropic/clauclaude-sonnet-4-5-20250929",
+      "full_name": "anthropic/claude-sonnet-4-5-20250929",
       "release_date": "2025-09-29",
       "max_output_tokens": 8192,
       "description": "Claude Sonnet 4.5 – Anthropic's frontier-level model",

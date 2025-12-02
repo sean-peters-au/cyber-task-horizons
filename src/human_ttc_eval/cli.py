@@ -20,6 +20,10 @@ from .datasets.cvebench import cvebench_retrieve # noqa
 from .datasets.cvebench import cvebench_prepare # noqa
 from .datasets.cvebench import cvebench_describe # noqa
 from .datasets.cvebench import cvebench_bench # noqa
+from .datasets.cybergym import cybergym_retrieve # noqa
+from .datasets.cybergym import cybergym_prepare # noqa
+from .datasets.cybergym import cybergym_describe # noqa
+from .datasets.cybergym import cybergym_bench # noqa
 from .analysis.plotter import create_horizon_plots
 
 from .core.registry import (

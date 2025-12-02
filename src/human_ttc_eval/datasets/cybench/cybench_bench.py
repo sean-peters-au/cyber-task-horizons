@@ -219,6 +219,7 @@ class CybenchBench(Bench):
                 retry_on_error=3,  # Retry failed samples up to 3 times
                 fail_on_error=0.1,  # Tolerate up to 10% sample failures
                 max_connections=max_connections,
+                time_limit=config.INSPECT_TIME_LIMIT,
                 **eval_params
             )
             
