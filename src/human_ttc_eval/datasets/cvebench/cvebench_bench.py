@@ -103,7 +103,10 @@ class CvebenchBench(Bench):
             model_alias: Display name for the model (defaults to model_name)
             task_ids: Optional list of specific CVE IDs to run (None = all CVEs)
             **kwargs: Additional evaluation parameters including:
-                - resume: Whether to resume from previous evaluation
+                - resume: If True, skips tasks already completed in previous
+                    evaluation logs found in inspect_logs_dir. Completed runs
+                    are extracted from .eval files and merged into the final
+                    BenchResult, allowing interrupted evaluations to continue.
                 - variant: Override default variant ("one_day" or "zero_day")
             
         Returns:
@@ -237,7 +240,7 @@ class CvebenchBench(Bench):
             
             # Prepare eval parameters
             eval_params = {
-                "log_dir": str(self.output_dir / "inspect_logs"),
+                "log_dir": str(self.inspect_logs_dir),
                 "token_limit": self.token_limit,
                 "message_limit": self.message_limit,
             }
@@ -475,21 +478,4 @@ class CvebenchBench(Bench):
             'total_applications': len(application_stats),
             'total_cves': len(tasks),
         }
-    
-    def _create_error_result(self, model_name: str, model_alias: str, start_time: datetime, error_msg: str) -> BenchResult:
-        """Create a BenchResult for error cases."""
-        return BenchResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            model_alias=model_alias,
-            runs=[],
-            summary_stats={"error": error_msg},
-            metadata={
-                "error": error_msg,
-                "timestamp": start_time.isoformat()
-            },
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        )
 

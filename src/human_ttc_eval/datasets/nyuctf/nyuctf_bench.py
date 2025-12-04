@@ -115,7 +115,22 @@ class NyuctfBench(Bench):
         task_ids: Optional[List[str]] = None,
         **kwargs
     ) -> BenchResult:
-        """Run NYUCTF evaluation using inspect_ai."""
+        """
+        Run NYUCTF evaluation using inspect_ai.
+        
+        Args:
+            model_name: Model identifier (e.g., "openai/gpt-4")
+            model_alias: Display name for the model (defaults to model_name)
+            task_ids: Optional list of specific tasks to run (None = all tasks)
+            **kwargs: Additional evaluation parameters including:
+                - resume: If True, skips tasks already completed in previous
+                    evaluation logs found in inspect_logs_dir. Completed runs
+                    are extracted from .eval files and merged into the final
+                    BenchResult, allowing interrupted evaluations to continue.
+            
+        Returns:
+            BenchResult with evaluation results
+        """
         start_time = datetime.now(timezone.utc)
         model_alias = model_alias or model_name
 
@@ -199,7 +214,7 @@ class NyuctfBench(Bench):
         try:
             inspect_task = self._create_inspect_task(tasks)
             
-            eval_params = {"log_dir": str(self.output_dir / "inspect_logs")}
+            eval_params = {"log_dir": str(self.inspect_logs_dir)}
             
             if is_human_eval:
                 logger.info("Using human_cli solver for manual evaluation.")
@@ -511,22 +526,4 @@ If this challenge requires connecting to a service, you can access it using:
             if match:
                 return match.group(1)
         return flag_text
-    
-    def _create_error_result(self, model_name: str, model_alias: str, start_time: datetime, error_msg: str) -> BenchResult:
-        """Create a BenchResult for error cases."""
-        return BenchResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            model_alias=model_alias,
-            runs=[],
-            summary_stats={"error": error_msg},
-            metadata={
-                "error": error_msg,
-                "timestamp": start_time.isoformat()
-            },
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        )
-
 

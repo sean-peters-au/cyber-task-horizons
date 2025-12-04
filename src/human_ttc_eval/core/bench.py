@@ -116,6 +116,11 @@ class Bench(ABC):
             Dataset name as a slug (lowercase, no spaces)
         """
         pass
+
+    @property
+    def inspect_logs_dir(self) -> Path:
+        """Directory for inspect_ai evaluation logs."""
+        return self.output_dir / "inspect_logs"
     
     def _load_human_baseline(self) -> None:
         """Load human baseline runs for comparison."""
@@ -208,6 +213,43 @@ class Bench(ABC):
             generation_cost=0.0,
             started_at=0.0,
             completed_at=0.0,
+        )
+
+    def _create_error_result(
+        self,
+        model_name: str,
+        model_alias: str,
+        start_time: datetime,
+        error_msg: str
+    ) -> BenchResult:
+        """
+        Create a BenchResult for error cases.
+        
+        Used when evaluation cannot proceed due to validation errors,
+        missing requirements, or other pre-run failures.
+        
+        Args:
+            model_name: Model identifier
+            model_alias: Display name for the model
+            start_time: Evaluation start time
+            error_msg: Description of the error that occurred
+            
+        Returns:
+            BenchResult with success=False and the error message
+        """
+        return BenchResult(
+            dataset_name=self.dataset_name,
+            model_name=model_name,
+            model_alias=model_alias,
+            runs=[],
+            summary_stats={"error": error_msg},
+            metadata={
+                "error": error_msg,
+                "timestamp": start_time.isoformat()
+            },
+            timestamp=start_time.isoformat(),
+            success=False,
+            error_message=error_msg
         )
     
     def _create_zero_imputed_result(
@@ -375,13 +417,13 @@ class Bench(ABC):
         
         Args:
             model_name: The model identifier
-            log_dir: Directory to search for logs (defaults to output_dir/inspect_logs)
+            log_dir: Directory to search for logs (defaults to inspect_logs_dir)
             
         Returns:
             Path to the most recent .eval file, or None if not found
         """
         if log_dir is None:
-            log_dir = self.output_dir / "inspect_logs"
+            log_dir = self.inspect_logs_dir
         
         if not log_dir.exists():
             return None
@@ -401,13 +443,13 @@ class Bench(ABC):
         
         Args:
             model_name: The model identifier
-            log_dir: Directory to search for logs (defaults to output_dir/inspect_logs)
+            log_dir: Directory to search for logs (defaults to inspect_logs_dir)
             
         Returns:
             List of paths to .eval files, sorted from oldest to newest
         """
         if log_dir is None:
-            log_dir = self.output_dir / "inspect_logs"
+            log_dir = self.inspect_logs_dir
         
         logger.info(f"Searching for .eval logs for model '{model_name}' in: {log_dir.resolve()}")
 

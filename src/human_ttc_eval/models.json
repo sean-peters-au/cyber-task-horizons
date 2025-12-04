@@ -51,7 +51,8 @@
       "full_name": "openai/gpt-4-1106-preview",
       "release_date": "2023-11-06",
       "max_output_tokens": 4096,
-      "description": "GPT-4 preview with vision and 128 K context"
+      "description": "GPT-4 preview with vision and 128 K context",
+      "alias": "GPT 4 Turbo (Nov 2023)"
     },
     {
       "provider": "openai",
@@ -131,7 +132,8 @@
       "full_name": "google/gemini-1.0-pro-001",
       "release_date": "2023-12-06",
       "max_output_tokens": 2048,
-      "description": "Gemini 1.0 Pro – first public Gemini model"
+      "description": "Gemini 1.0 Pro – first public Gemini model",
+      "alias": "Gemini 1.0 Pro"
     },
     {
       "provider": "google",
@@ -139,7 +141,8 @@
       "full_name": "google/gemini-1.5-pro-001",
       "release_date": "2024-02-15",
       "max_output_tokens": 8192,
-      "description": "Gemini 1.5 Pro – 1 M-token context preview"
+      "description": "Gemini 1.5 Pro – 1 M-token context preview",
+      "alias": "Gemini 1.5 Pro"
     },
     {
       "provider": "google",
@@ -147,7 +150,8 @@
       "full_name": "google/gemini-2.0-flash-20240520",
       "release_date": "2024-05-20",
       "max_output_tokens": 8192,
-      "description": "Gemini 2.0 Flash – low-latency variant"
+      "description": "Gemini 2.0 Flash – low-latency variant",
+      "alias": "Gemini 2.0 Flash"
     },
     {
       "provider": "google",
@@ -155,7 +159,8 @@
       "full_name": "google/gemini-2.5-pro-preview-20250506",
       "release_date": "2025-05-06",
       "max_output_tokens": 8192,
-      "description": "Gemini 2.5 Pro (I/O preview) – enhanced coding & reasoning"
+      "description": "Gemini 2.5 Pro (I/O preview) – enhanced coding & reasoning",
+      "alias": "Gemini 2.5 Pro (May 2025)"
     },
     {
       "provider": "google",
@@ -163,7 +168,8 @@
       "full_name": "google/gemini-2.5-flash-preview-20250520",
       "release_date": "2025-05-20",
       "max_output_tokens": 8192,
-      "description": "Gemini 2.5 Flash preview – speed-optimised 2.5 variant"
+      "description": "Gemini 2.5 Flash preview – speed-optimised 2.5 variant",
+      "alias": "Gemini 2.5 Flash"
     },
     {
       "provider": "google",
@@ -171,7 +177,8 @@
       "full_name": "google/gemini-3-pro-preview",
       "release_date": "2025-11-18",
       "max_output_tokens": 65536,
-      "description": "Gemini 3 Pro preview"
+      "description": "Gemini 3 Pro preview",
+      "alias": "Gemini 3 Pro"
     },
     {
       "provider": "openai",
@@ -179,7 +186,8 @@
       "full_name": "openai/gpt-5.1-2025-11-13",
       "release_date": "2025-11-13",
       "max_output_tokens": 128000,
-      "description": "GPT-5.1 – OpenAI's latest model"
+      "description": "GPT-5.1 – OpenAI's latest model",
+      "alias": "GPT 5.1"
     },
     {
       "provider": "openai",
@@ -187,7 +195,8 @@
       "full_name": "openai/gpt-5-mini-2025-08-07",
       "release_date": "2025-08-07",
       "max_output_tokens": 128000,
-      "description": "GPT-5 Mini"
+      "description": "GPT-5 Mini",
+      "alias": "GPT 5 Mini"
     },
     {
       "provider": "openai",
@@ -195,7 +204,8 @@
       "full_name": "openai/gpt-5-nano-2025-08-07",
       "release_date": "2025-08-07",
       "max_output_tokens": 128000,
-      "description": "GPT-5 Nano"
+      "description": "GPT-5 Nano",
+      "alias": "GPT 5 Nano"
     },
     {
       "provider": "openai",
@@ -203,7 +213,8 @@
       "full_name": "openai/gpt-5-2025-08-07",
       "release_date": "2025-08-07",
       "max_output_tokens": 128000,
-      "description": "GPT-5"
+      "description": "GPT-5",
+      "alias": "GPT 5"
     },
     {
       "provider": "openai",
@@ -211,7 +222,8 @@
       "full_name": "openai/gpt-5-pro-2025-10-06",
       "release_date": "2025-10-06",
       "max_output_tokens": 128000,
-      "description": "GPT-5 Pro"
+      "description": "GPT-5 Pro",
+      "alias": "GPT 5 Pro"
     },
     {
       "provider": "openai",
@@ -219,7 +231,9 @@
       "full_name": "openai/gpt-5.1-codex",
       "release_date": "2025-11-13",
       "max_output_tokens": 128000,
-      "description": "GPT-5.1 Codex"
+      "description": "GPT-5.1 Codex",
+      "alias": "GPT 5.1 Codex",
+      "is_sota": true
     },
     {
       "provider": "openai",
@@ -227,7 +241,8 @@
       "full_name": "openai/gpt-5-codex",
       "release_date": "2025-11-13",
       "max_output_tokens": 128000,
-      "description": "GPT-5 Codex"
+      "description": "GPT-5 Codex",
+      "alias": "GPT 5 Codex"
     },
     {
       "provider": "google",
@@ -254,7 +269,8 @@
       "release_date": "2025-09-29",
       "max_output_tokens": 8192,
       "description": "Claude Sonnet 4.5 – Anthropic's frontier-level model",
-      "alias": "Claude Sonnet 4.5"
+      "alias": "Claude Sonnet 4.5",
+      "is_sota": true
     },
     {
       "provider": "anthropic",

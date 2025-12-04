@@ -7,8 +7,11 @@ This retriever scans the actual challenges and creates raw CVE metadata for the 
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+import yaml
 
 from human_ttc_eval.core.registry import register_retriever
 from human_ttc_eval.core.retrieve import Retrieve
@@ -23,7 +26,7 @@ class CvebenchRetrieve(Retrieve):
     Retrieves CVE-Bench metadata by scanning the cloned cve-bench repository.
     
     Dynamically reads CVE IDs from the challenges directory and extracts
-    metadata from each challenge's metadata.yaml file.
+    metadata from each challenge's eval.yml file.
     """
     
     DEFAULT_OUTPUT_FILENAME = "cvebench_raw_data.jsonl"
@@ -67,7 +70,12 @@ class CvebenchRetrieve(Retrieve):
     
     def _load_challenge_metadata(self, cve_id: str) -> Dict[str, Any]:
         """
-        Load metadata for a specific CVE challenge.
+        Load metadata for a specific CVE challenge from eval.yml.
+        
+        Parses the eval.yml file to extract:
+        - Vulnerability description from one_day.prompt
+        - Application URL and attacker role from metadata section
+        - Target platform inferred from compose.yml
         
         Args:
             cve_id: The CVE identifier
@@ -76,26 +84,116 @@ class CvebenchRetrieve(Retrieve):
             Dictionary with challenge metadata
         """
         challenge_dir = self.challenges_dir / cve_id
-        metadata_file = challenge_dir / "metadata.yaml"
+        eval_file = challenge_dir / "eval.yml"
+        compose_file = challenge_dir / "compose.yml"
         
-        metadata = {
-            "category": "unknown",
-            "application": "unknown",
-            "description": "",
+        metadata: Dict[str, Any] = {
+            "vulnerability_description": "",
+            "application_url": "",
+            "attacker_role": "user",
+            "target_platform": "unknown",
         }
         
-        if metadata_file.exists():
+        # Parse eval.yml for vulnerability info and metadata
+        if eval_file.exists():
             try:
-                import yaml
-                with open(metadata_file, 'r') as f:
-                    yaml_data = yaml.safe_load(f) or {}
-                    metadata["category"] = yaml_data.get("attack_type", "unknown")
-                    metadata["application"] = yaml_data.get("application", "unknown")
-                    metadata["description"] = yaml_data.get("description", "")
+                with open(eval_file, 'r', encoding='utf-8') as f:
+                    eval_data = yaml.safe_load(f) or {}
+                
+                # Extract vulnerability description from one_day prompt
+                one_day_prompt = eval_data.get("variants", {}).get("one_day", {}).get("prompt", "")
+                if one_day_prompt:
+                    metadata["vulnerability_description"] = self._extract_vulnerability_description(one_day_prompt)
+                
+                # Extract metadata fields
+                eval_metadata = eval_data.get("metadata", {})
+                metadata["application_url"] = eval_metadata.get("application_url", "")
+                metadata["attacker_role"] = eval_metadata.get("attacker_role", "user")
+                
             except Exception as e:
-                logger.warning(f"Could not parse metadata.yaml for {cve_id}: {e}")
+                logger.warning(f"Could not parse eval.yml for {cve_id}: {e}")
+        
+        # Infer target platform from compose.yml
+        if compose_file.exists():
+            metadata["target_platform"] = self._infer_target_platform(compose_file)
         
         return metadata
+    
+    def _extract_vulnerability_description(self, prompt: str) -> str:
+        """
+        Extract the vulnerability description from the one_day prompt.
+        
+        The prompt follows a pattern like:
+        "The website ... is known to have the following vulnerability:
+        <description>
+        
+        As a/an user, exploit this vulnerability..."
+        
+        Args:
+            prompt: The one_day variant prompt text
+            
+        Returns:
+            Extracted vulnerability description
+        """
+        # Look for the pattern between "vulnerability:" and "As a/an"
+        match = re.search(
+            r"is known to have the following vulnerability:\s*\n\s*(.+?)\s*\n\s*As a/an",
+            prompt,
+            re.DOTALL
+        )
+        if match:
+            return match.group(1).strip()
+        
+        # Fallback: try to extract just the line after "vulnerability:"
+        match = re.search(r"following vulnerability:\s*\n\s*(.+?)(?:\n|$)", prompt)
+        if match:
+            return match.group(1).strip()
+        
+        return ""
+    
+    def _infer_target_platform(self, compose_file: Path) -> str:
+        """
+        Infer the target platform from compose.yml service definitions.
+        
+        Looks for common service patterns like:
+        - wp, wordpress -> wordpress
+        - mysql, mariadb -> database
+        - zabbix -> zabbix
+        - python, flask, django -> python
+        
+        Args:
+            compose_file: Path to the compose.yml file
+            
+        Returns:
+            Inferred platform name or "unknown"
+        """
+        try:
+            with open(compose_file, 'r', encoding='utf-8') as f:
+                content = f.read().lower()
+            
+            # Check for common platform patterns
+            if "compose-wp.yml" in content or "wordpress" in content:
+                return "wordpress"
+            if "zabbix" in content:
+                return "zabbix"
+            if "flask" in content or "django" in content:
+                return "python"
+            if "node" in content or "npm" in content:
+                return "nodejs"
+            if "php" in content:
+                return "php"
+            if "java" in content or "spring" in content:
+                return "java"
+            if "rust" in content or "cargo" in content:
+                return "rust"
+            if "go" in content or "golang" in content:
+                return "go"
+            
+            return "unknown"
+            
+        except Exception as e:
+            logger.warning(f"Could not parse compose.yml: {e}")
+            return "unknown"
     
     def _build_raw_data(self) -> List[Dict[str, Any]]:
         """
@@ -113,15 +211,15 @@ class CvebenchRetrieve(Retrieve):
             record = {
                 "task_id": cve_id,
                 "name": cve_id,
-                "category": metadata["category"],
-                "application": metadata["application"],
+                "target_platform": metadata["target_platform"],
                 "variants": ["one_day", "zero_day"],
                 "source": "cve-bench",
                 "metadata": {
                     "cve_id": cve_id,
-                    "category": metadata["category"],
-                    "target_application": metadata["application"],
-                    "description": metadata.get("description", ""),
+                    "vulnerability_description": metadata["vulnerability_description"],
+                    "application_url": metadata["application_url"],
+                    "attacker_role": metadata["attacker_role"],
+                    "target_platform": metadata["target_platform"],
                 }
             }
             raw_data.append(record)

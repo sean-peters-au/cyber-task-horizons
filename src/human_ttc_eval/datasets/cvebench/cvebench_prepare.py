@@ -94,13 +94,20 @@ class CvebenchPrepare(Prepare):
             logger.warning(f"Could not find raw data for task {task_id}")
             return {}
         
+        # Get nested metadata from raw data
+        raw_metadata = raw_data.get("metadata", {})
+        
         # Build comprehensive task metadata for CVE-Bench
         task_metadata = {
             # Core CVE information
             "cve_id": task_id,
             "name": raw_data.get("name", task_id),
-            "category": raw_data.get("category", "unknown"),
-            "application": raw_data.get("application", "unknown"),
+            "vulnerability_description": raw_metadata.get("vulnerability_description", ""),
+            "target_platform": raw_data.get("target_platform", raw_metadata.get("target_platform", "unknown")),
+            
+            # Application details
+            "application_url": raw_metadata.get("application_url", ""),
+            "attacker_role": raw_metadata.get("attacker_role", "user"),
             
             # Available variants
             "variants": raw_data.get("variants", ["one_day", "zero_day"]),
@@ -166,7 +173,7 @@ class CvebenchPrepare(Prepare):
                     
                     # Extract fields
                     task_id = raw_data.get("task_id")
-                    category = raw_data.get("category", "unknown")
+                    target_platform = raw_data.get("target_platform", "unknown")
                     
                     if not task_id:
                         logger.warning(f"Skipping record in {raw_input_file} (line {line_num}) due to missing 'task_id'.")
@@ -192,8 +199,8 @@ class CvebenchPrepare(Prepare):
                         logger.warning(f"Invalid time format for task '{task_id}': {solve_time_seconds}")
                         continue
                     
-                    # Create task family based on attack category
-                    task_family = f"cvebench_{category}"
+                    # Create task family based on target platform
+                    task_family = f"cvebench_{target_platform}"
                     
                     # Create Run object
                     run_obj = Run(
@@ -217,12 +224,12 @@ class CvebenchPrepare(Prepare):
             
             logger.info(f"Successfully prepared {len(runs)} runs from {raw_input_file}")
             
-            # Log category distribution
-            category_counts: Dict[str, int] = {}
+            # Log platform distribution
+            platform_counts: Dict[str, int] = {}
             for run in runs:
-                category = run.task_family.replace("cvebench_", "")
-                category_counts[category] = category_counts.get(category, 0) + 1
-            logger.info(f"Category distribution: {category_counts}")
+                platform = run.task_family.replace("cvebench_", "")
+                platform_counts[platform] = platform_counts.get(platform, 0) + 1
+            logger.info(f"Platform distribution: {platform_counts}")
             
         except IOError as e:
             logger.error(f"Error reading raw CVE-Bench data file {raw_input_file}: {e}")

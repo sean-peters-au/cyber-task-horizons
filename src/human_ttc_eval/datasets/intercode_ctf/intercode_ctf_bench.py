@@ -127,7 +127,11 @@ class InterCodeCTFBench(Bench):
             model_name: Model identifier (e.g., "openai/gpt-4")
             model_alias: Display name for the model (defaults to model_name)
             task_ids: Optional list of specific tasks to run (None = all tasks)
-            **kwargs: Additional evaluation parameters
+            **kwargs: Additional evaluation parameters including:
+                - resume: If True, skips tasks already completed in previous
+                    evaluation logs found in inspect_logs_dir. Completed runs
+                    are extracted from .eval files and merged into the final
+                    BenchResult, allowing interrupted evaluations to continue.
             
         Returns:
             BenchResult with evaluation results
@@ -175,7 +179,7 @@ class InterCodeCTFBench(Bench):
             # Prepare eval parameters
             eval_params = {
                 "model": model_name,
-                "log_dir": str(self.output_dir / "inspect_logs"),
+                "log_dir": str(self.inspect_logs_dir),
                 "token_limit": config.INTERCODE_TOKEN_LIMIT,
                 "max_samples": 5,
             }
@@ -512,23 +516,6 @@ class InterCodeCTFBench(Bench):
             'category_breakdown': category_stats,
             'total_categories': len(category_stats)
         }
-    
-    def _create_error_result(self, model_name: str, model_alias: str, start_time: datetime, error_msg: str) -> BenchResult:
-        """Create a BenchResult for error cases."""
-        return BenchResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            model_alias=model_alias,
-            runs=[],
-            summary_stats={"error": error_msg},
-            metadata={
-                "error": error_msg,
-                "timestamp": start_time.isoformat()
-            },
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        )
 
 
 def ctf_agent(attempts: int = 10):

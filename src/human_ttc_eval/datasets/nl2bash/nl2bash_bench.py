@@ -83,7 +83,11 @@ class NL2BashBench(Bench):
             model_name: Model identifier (e.g., "openai/gpt-4" or "openai/gpt2" for local)
             model_alias: Display name for the model (defaults to model_name)
             task_ids: Optional list of specific tasks to run (None = all tasks)
-            **kwargs: Additional evaluation parameters
+            **kwargs: Additional evaluation parameters including:
+                - resume: If True, skips tasks already completed in previous
+                    evaluation logs found in inspect_logs_dir. Completed runs
+                    are extracted from .eval files and merged into the final
+                    BenchResult, allowing interrupted evaluations to continue.
             
         Returns:
             BenchResult with evaluation results
@@ -129,7 +133,7 @@ class NL2BashBench(Bench):
             # Prepare eval parameters
             eval_params = {
                 "model": eval_model_name,
-                "log_dir": str(self.output_dir / "inspect_logs")
+                "log_dir": str(self.inspect_logs_dir)
             }
             
             # Add base URL for local models
@@ -169,7 +173,7 @@ class NL2BashBench(Bench):
                     "num_tasks": len(tasks),
                     "inspect_ai_version": inspect_ai.__version__,
                     "scoring_method": "llm_functional_equivalence",
-                    "log_dir": str(self.output_dir / "inspect_logs"),
+                    "log_dir": str(self.inspect_logs_dir),
                     "is_local_model": is_local
                 },
                 timestamp=start_time.isoformat(),
@@ -507,20 +511,3 @@ class NL2BashBench(Bench):
             'scoring_method': 'llm_functional_equivalence',
             'success_threshold': 0.8
         }
-    
-    def _create_error_result(self, model_name: str, model_alias: str, start_time: datetime, error_msg: str) -> BenchResult:
-        """Create a BenchResult for error cases."""
-        return BenchResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            model_alias=model_alias,
-            runs=[],
-            summary_stats={"error": error_msg},
-            metadata={
-                "error": error_msg,
-                "timestamp": start_time.isoformat()
-            },
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        ) 

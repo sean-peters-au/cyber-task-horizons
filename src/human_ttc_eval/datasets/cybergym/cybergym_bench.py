@@ -234,7 +234,10 @@ class CybergymBench(Bench):
             model_alias: Display name for the model (defaults to model_name)
             task_ids: Optional list of specific task IDs to run (None = all tasks)
             **kwargs: Additional evaluation parameters including:
-                - resume: Whether to resume from previous evaluation
+                - resume: If True, skips tasks already completed in previous
+                    evaluation logs found in inspect_logs_dir. Completed runs
+                    are extracted from .eval files and merged into the final
+                    BenchResult, allowing interrupted evaluations to continue.
                 - difficulty: Override default difficulty level
             
         Returns:
@@ -344,7 +347,7 @@ class CybergymBench(Bench):
                 return self._create_error_result(model_name, model_alias, start_time, error_msg)
             
             # Prepare log directory
-            log_dir = str(self.output_dir / "inspect_logs")
+            log_dir = str(self.inspect_logs_dir)
             
             # Get base URL for local models
             model_base_url = None
@@ -703,20 +706,4 @@ class CybergymBench(Bench):
                     return (score_val, 1 if score_val > 0 else 0)
         
         return 0.0, 0
-    
-    def _create_error_result(self, model_name: str, model_alias: str, start_time: datetime, error_msg: str) -> BenchResult:
-        """Create a BenchResult for error cases."""
-        return BenchResult(
-            dataset_name=self.dataset_name,
-            model_name=model_name,
-            model_alias=model_alias,
-            runs=[],
-            summary_stats={"error": error_msg},
-            metadata={
-                "error": error_msg,
-                "timestamp": start_time.isoformat()
-            },
-            timestamp=start_time.isoformat(),
-            success=False,
-            error_message=error_msg
-        )
+
